@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>제주도 바다와 태양</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: #0b1622; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; color: #fff; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+    canvas:active { cursor: grabbing; }
+
+    .hud {
+      position: fixed; top: 12px; left: 12px; width: min(330px, calc(100vw - 24px));
+      background: rgba(10, 22, 36, .72); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, .18); border-radius: 14px; padding: 12px 14px;
+      font-size: .88rem; z-index: 5;
+    }
+    .hud h1 { font-size: 1rem; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .hud button.toggle { background: none; border: 1px solid rgba(255,255,255,.3); color: #fff; border-radius: 8px; padding: 2px 8px; cursor: pointer; font: inherit; }
+    .hud .body.hide { display: none; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 7px 0; }
+    .row label { width: 76px; flex: none; color: #bcd; }
+    .row input[type=range] { flex: 1; accent-color: #ffb347; min-width: 0; }
+    .row output { width: 54px; text-align: right; font-variant-numeric: tabular-nums; flex: none; }
+    .btns { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+    .btns button, .file {
+      font: inherit; font-size: .82rem; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+      border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.08); color: #fff;
+    }
+    .btns button:hover, .file:hover { background: rgba(255,255,255,.2); }
+    .btns button.on { background: #ff8a3d; border-color: #ff8a3d; color: #1a1005; font-weight: bold; }
+    .file input { display: none; }
+    .info { margin-top: 8px; font-size: .78rem; color: #9fb4c8; line-height: 1.5; }
+    .clock { font-size: 1.25rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+    #msg { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 24px; z-index: 9; background: #0b1622; }
+    #fps { position: fixed; right: 10px; bottom: 8px; font-size: .75rem; color: rgba(255,255,255,.6); z-index: 5; }
+  </style>
+</head>
+<body>
+  <div class="hud" id="hud">
+    <h1><span>🌊 제주도 바다와 태양</span><button class="toggle" id="toggle" aria-expanded="true">접기</button></h1>
+    <div class="body" id="hudBody">
+      <div class="row"><span class="clock" id="clock">--:--</span><span id="sunInfo" class="info" style="margin:0"></span></div>
+      <div class="row"><label for="tSlider">시각</label><input type="range" id="tSlider" min="0" max="1" step="0.001" value="0.3"><output id="tOut"></output></div>
+      <div class="btns">
+        <button id="play" class="on">⏸ 태양 멈추기</button>
+        <button id="follow" class="on">🎥 태양 따라보기</button>
+      </div>
+      <div class="row"><label for="dayLen">하루 길이</label><input type="range" id="dayLen" min="10" max="120" step="1" value="40"><output id="dayOut">40초</output></div>
+      <div class="row"><label for="amp">파도 높이</label><input type="range" id="amp" min="0.2" max="3" step="0.05" value="1"><output id="ampOut">1.0x</output></div>
+      <div class="row"><label for="wind">파도 방향</label><input type="range" id="wind" min="0" max="360" step="5" value="30"><output id="windOut">30°</output></div>
+      <div class="btns" id="views">
+        <button data-v="coast">🏖️ 해안</button>
+        <button data-v="sea">🚤 바다 위</button>
+        <button data-v="peak">🏔️ 한라산</button>
+        <button data-v="sky">🛰️ 섬 전체</button>
+      </div>
+      <div class="btns">
+        <label class="file">📂 DEM 이미지 불러오기<input type="file" id="demFile" accept="image/*"></label>
+        <button id="demReset">가짜 섬으로</button>
+      </div>
+      <div class="info" id="demInfo">DEM이 없어서 한라산 모양의 가짜 섬을 쓰고 있어요.</div>
+      <div class="info">조작: 드래그=둘러보기, 휠=앞뒤 이동, W/A/S/D=이동, Q/E=위·아래, Shift=빠르게</div>
+    </div>
+  </div>
+  <div id="fps"></div>
+  <div id="msg"><div><h2>WebGL을 사용할 수 없어요</h2><p style="margin-top:8px">브라우저의 하드웨어 가속을 켜거나 다른 브라우저로 열어 보세요.</p></div></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    if (typeof THREE === 'undefined') {
+      document.getElementById('msg').style.display = 'flex';
+      document.querySelector('#msg h2').textContent = 'Three.js를 불러오지 못했어요';
+      document.querySelector('#msg p').textContent = '인터넷 연결을 확인한 뒤 새로고침하세요.';
+      return;
+    }
+
+    /* ====================== 설정 ====================== */
+    const SIZE_X = 76000, SIZE_Z = 51000;      // 지형이 덮는 동서/남북 길이(m). 1 단위 = 1 m
+    const NX = 512, NZ = 344;                   // 지형 격자
+    const MAX_ELEV = 1947;                      // 한라산(m), DEM 이미지의 흰색이 뜻하는 고도
+    const SUN_AZ0 = 90, SUN_AZ1 = 270;          // 동 -> 남 -> 서
+    const SUN_PEAK = 33;                        // 한낮 최고 고도(도). 제주 동지 무렵 한낮과 비슷
+
+    /* ====================== 렌더러 ====================== */
+    const canvas = document.createElement('canvas');
+    document.body.insertBefore(canvas, document.body.firstChild);
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    } catch (e) {
+      document.getElementById('msg').style.display = 'flex';
+      return;
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(62, 1, 3, 250000);
+    camera.rotation.order = 'YXZ';
+
+    /* ====================== 공통 GLSL ====================== */
+    const GLSL_COMMON = `
+      uniform vec3 uSunDir;
+      uniform float uExposure;
+      float hash(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+
+      vec3 skyColor(vec3 dir) {
+        float sunH = clamp(uSunDir.y, 0.0, 1.0);
+        float day = smoothstep(0.0, 0.40, uSunDir.y);
+        vec3 zenith  = mix(vec3(0.04, 0.07, 0.20), vec3(0.10, 0.28, 0.75), day);
+        vec3 horizon = mix(vec3(0.90, 0.42, 0.20), vec3(0.62, 0.78, 0.96), day);
+        float h = clamp(dir.y, 0.0, 1.0);
+        vec3 col = mix(horizon, zenith, pow(h, 0.42));
+        float cs = max(dot(dir, uSunDir), 0.0);
+        vec3 glowCol = mix(vec3(1.0, 0.45, 0.18), vec3(1.0, 0.85, 0.6), day);
+        col += glowCol * pow(cs, 6.0) * 0.30;
+        col += glowCol * pow(cs, 48.0) * 0.55;
+        return col * (0.25 + 0.75 * smoothstep(0.0, 0.15, uSunDir.y));
+      }
+      vec3 sunLight() {
+        float day = smoothstep(0.0, 0.35, uSunDir.y);
+        vec3 c = mix(vec3(1.0, 0.50, 0.22), vec3(1.0, 0.95, 0.88), day);
+        return c * 3.2 * smoothstep(0.0, 0.12, uSunDir.y);
+      }
+      vec3 tonemap(vec3 c) {
+        c = vec3(1.0) - exp(-c * uExposure);
+        return pow(c, vec3(1.0 / 2.2));
+      }
+    `;
+
+    const sharedUniforms = {
+      uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+      uExposure: { value: 1.15 },
+      uTime: { value: 0 },
+      uAmp: { value: 1.0 },
+      uWindDir: { value: 0.5 },
+      uChop: { value: 0.9 },
+      uFogDensity: { value: 0.000012 },
+      uPixel: { value: 0.002 }
+    };
+
+    /* ====================== 하늘 ====================== */
+    const skyMat = new THREE.ShaderMaterial({
+      uniforms: sharedUniforms,
+      side: THREE.BackSide, depthWrite: false, depthTest: false,
+      vertexShader: `
+        varying vec3 vDir;
+        void main() {
+          vDir = normalize(position);
+          vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          gl_Position = p;
+        }`,
+      fragmentShader: GLSL_COMMON + `
+        varying vec3 vDir;
+        void main() {
+          vec3 d = normalize(vDir);
+          vec3 col = skyColor(d);
+          float cs = dot(d, uSunDir);
+          float disc = smoothstep(cos(0.0125), cos(0.0085), cs);      // 해 원판(약 1.4도)
+          col += sunLight() * disc * 8.0;
+          if (d.y < 0.0) col = mix(col, skyColor(normalize(vec3(d.x, 0.0, d.z))) * 0.9, smoothstep(0.0, -0.1, d.y));
+          gl_FragColor = vec4(tonemap(col), 1.0);
+        }`
+    });
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(150000, 32, 16), skyMat);
+    sky.frustumCulled = false;
+    sky.renderOrder = -10;
+    scene.add(sky);
+
+    /* ====================== 바다 ====================== */
+    const WAVE_GLSL = `
+      uniform float uTime, uAmp, uWindDir;
+      // 큰 파도 8개: 방향/파장은 인덱스로 정해지는 의사난수
+      void bigWave(int i, out vec2 dir, out float k, out float w, out float A) {
+        float fi = float(i);
+        float ang = uWindDir + (hash(fi + 1.0) - 0.5) * 1.5;
+        dir = vec2(cos(ang), sin(ang));
+        float lambda = mix(28.0, 170.0, hash(fi * 3.7 + 2.0));
+        k = 6.2831853 / lambda;
+        w = sqrt(9.81 * k);
+        A = uAmp * lambda * 0.0075;
+      }
+    `;
+    const oceanMat = new THREE.ShaderMaterial({
+      uniforms: sharedUniforms,
+      side: THREE.DoubleSide,
+      vertexShader: GLSL_COMMON + WAVE_GLSL + `
+        uniform float uChop;
+        varying vec3 vWorld;
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vec2 p = wp.xz;
+          float dist = length(wp.xyz - cameraPosition);
+          float fade = 1.0 - smoothstep(500.0, 2600.0, dist);
+          float h = 0.0;
+          vec2 off = vec2(0.0);
+          for (int i = 0; i < 8; i++) {
+            vec2 dir; float k, w, A;
+            bigWave(i, dir, k, w, A);
+            float ph = k * dot(dir, p) - w * uTime;
+            h += A * sin(ph);
+            off += dir * (uChop * A * cos(ph));
+          }
+          wp.y += h * fade;
+          wp.xz += off * fade;
+          vWorld = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }`,
+      fragmentShader: GLSL_COMMON + WAVE_GLSL + `
+        uniform float uFogDensity;
+        varying vec3 vWorld;
+
+        uniform float uPixel;     // 화면 한 픽셀이 보는 각도(라디안)
+
+        // lost: 픽셀보다 작아서 평균 내 버린 잔물결이 만드는 기울기 분산 -> 반사 범위를 넓히는 데 씀
+        vec3 waterNormal(vec2 p, float dist, out float lost) {
+          vec2 d = vec2(0.0);
+          float fp = dist * uPixel;           // 이 픽셀이 덮는 바다 면의 크기(m)
+          lost = 0.0;
+          for (int i = 0; i < 8; i++) {
+            vec2 dir; float k, w, A;
+            bigWave(i, dir, k, w, A);
+            float ph = k * dot(dir, p) - w * uTime;
+            float lambda = 6.2831853 / k;
+            float att = smoothstep(1.5 * fp, 4.0 * fp, lambda);
+            d += dir * (A * k * cos(ph) * att);
+            lost += (1.0 - att) * (1.0 - att) * 0.25 * A * k * A * k;
+          }
+          // 작은 잔물결: 태양 빛길의 반짝임을 만든다
+          for (int i = 0; i < 10; i++) {
+            float fi = float(i) + 20.0;
+            float ang = uWindDir + (hash(fi) - 0.5) * 3.0;
+            vec2 dir = vec2(cos(ang), sin(ang));
+            float lambda = mix(1.6, 13.0, hash(fi * 2.3 + 5.0));
+            float k = 6.2831853 / lambda;
+            float w = sqrt(9.81 * k);
+            float A = lambda * 0.010 * (0.5 + 0.5 * uAmp);
+            float ph = k * dot(dir, p) - w * uTime * 1.2 + fi * 1.7;
+            float att = smoothstep(1.5 * fp, 4.0 * fp, lambda);
+            d += dir * (A * k * cos(ph) * att);
+            lost += (1.0 - att) * (1.0 - att) * 0.25 * A * k * A * k;
+          }
+          return normalize(vec3(-d.x, 1.0, -d.y));
+        }
+
+        void main() {
+          vec3 toCam = cameraPosition - vWorld;
+          float dist = length(toCam);
+          vec3 V = toCam / dist;
+          float lost;
+          vec3 N = waterNormal(vWorld.xz, dist, lost);
+
+          float cosT = clamp(dot(N, V), 0.0, 1.0);
+          float F = 0.02 + 0.98 * pow(1.0 - cosT, 5.0);
+          vec3 R = reflect(-V, N);
+          R.y = abs(R.y);
+          vec3 refl = skyColor(R);
+
+          float lightAmt = 0.22 + 0.78 * smoothstep(0.0, 0.5, uSunDir.y);
+          vec3 body = vec3(0.004, 0.050, 0.085) * lightAmt + vec3(0.0, 0.05, 0.05) * lightAmt * pow(1.0 - cosT, 2.0);
+          vec3 col = mix(body, refl, F);
+
+          // 태양 빛길: Beckmann 분포. 멀리서 평균 낸 잔물결(lost)만큼 반사 범위가 넓어져 빛길이 이어짐
+          vec3 H = normalize(V + uSunDir);
+          float nh = clamp(dot(N, H), 0.001, 1.0);
+          float m2 = 0.0004 + lost;
+          float tan2 = (1.0 - nh * nh) / (nh * nh);
+          float D = exp(-tan2 / m2) / (3.14159 * m2 * nh * nh * nh * nh);
+          float Fh = 0.02 + 0.98 * pow(1.0 - max(dot(V, H), 0.0), 5.0);
+          vec3 spec = sunLight() * D * Fh / (4.0 * max(dot(N, V), 0.06)) * 0.35;
+          col += spec * step(0.0, uSunDir.y);
+
+          // 멀리 갈수록 대기에 묻힘
+          vec3 hdir = normalize(vec3(-V.x, 0.04, -V.z));
+          float fog = 1.0 - exp(-dist * uFogDensity);
+          col = mix(col, skyColor(hdir), fog);
+          gl_FragColor = vec4(tonemap(col), 1.0);
+        }`
+    });
+
+    function makeOceanGeometry(rings, segs, rMin, rMax) {
+      const pos = new Float32Array((rings + 1) * segs * 3);
+      for (let i = 0; i <= rings; i++) {
+        const r = rMin * Math.pow(rMax / rMin, i / rings);
+        for (let s = 0; s < segs; s++) {
+          const a = (s / segs) * Math.PI * 2;
+          const o = (i * segs + s) * 3;
+          pos[o] = Math.cos(a) * r; pos[o + 1] = 0; pos[o + 2] = Math.sin(a) * r;
+        }
+      }
+      const idx = new Uint32Array(rings * segs * 6);
+      let n = 0;
+      for (let i = 0; i < rings; i++) {
+        for (let s = 0; s < segs; s++) {
+          const a = i * segs + s, b = i * segs + (s + 1) % segs;
+          const c = (i + 1) * segs + s, d = (i + 1) * segs + (s + 1) % segs;
+          idx[n++] = a; idx[n++] = c; idx[n++] = b;
+          idx[n++] = b; idx[n++] = c; idx[n++] = d;
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      return g;
+    }
+    // 카메라를 중심으로 한 극좌표 격자: 가까울수록 촘촘, 멀수록 성김
+    const ocean = new THREE.Mesh(makeOceanGeometry(300, 360, 4, 90000), oceanMat);
+    ocean.frustumCulled = false;
+    scene.add(ocean);
+
+    /* ====================== 지형 ====================== */
+    function mulberry32(a) {
+      return function () {
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    // 한라산 모양의 가짜 섬 (행 0 = 북쪽)
+    function proceduralHeights() {
+      const rng = mulberry32(7);
+      const ax = 0.80, ay = 0.55;
+      const cones = [];
+      while (cones.length < 70) {
+        const cx = (rng() * 2 - 1) * 0.75, cy = (rng() * 2 - 1) * 0.5;
+        if ((cx / ax) ** 2 + (cy / ay) ** 2 < 0.8) {
+          cones.push([cx, cy, 0.008 + rng() * 0.010, 60 + rng() * 130]);
+        }
+      }
+      const ph = [];
+      for (let o = 0; o < 6; o++) ph.push([rng() * 6.3, rng() * 6.3]);
+      const h = new Float32Array(NX * NZ);
+      for (let j = 0; j < NZ; j++) {
+        const Y = 1 - 2 * j / (NZ - 1);               // 북쪽이 +
+        for (let i = 0; i < NX; i++) {
+          const X = -1 + 2 * i / (NX - 1);
+          const ang = Math.atan2(Y / ay, X / ax);
+          const wob = 1 + 0.06 * Math.sin(3 * ang + 1.3) + 0.04 * Math.sin(5 * ang + 0.4) + 0.03 * Math.sin(9 * ang + 2.1);
+          const d = Math.hypot(X / ax, Y / ay) / wob;
+          if (d >= 1) { h[j * NX + i] = 0; continue; }
+          const land = 1 - d;
+          const shield = 520 * Math.pow(land, 0.85);
+          const r = Math.hypot(X / 0.28, Y / 0.20);
+          const cone = 1500 * Math.pow(Math.max(1 - r, 0), 1.5);
+          const crater = 90 * Math.exp(-Math.pow(Math.hypot(X, Y) / 0.02, 2));
+          let c = 0;
+          for (const k of cones) c += k[3] * Math.exp(-((X - k[0]) ** 2 + (Y - k[1]) ** 2) / (k[2] * k[2]));
+          let n = 0;
+          for (let o = 0; o < 6; o++) {
+            const f = Math.pow(2, o + 2);
+            n += (35 / Math.pow(1.9, o)) * Math.sin(f * Math.PI * X + ph[o][0]) * Math.sin(f * Math.PI * Y + ph[o][1]);
+          }
+          const mask = Math.min(land * 8, 1);
+          h[j * NX + i] = Math.max(shield + cone - crater + c + n * mask, 0);
+        }
+      }
+      return h;
+    }
+
+    const terrainMat = new THREE.ShaderMaterial({
+      uniforms: sharedUniforms,
+      vertexShader: `
+        attribute vec3 aColor;
+        varying vec3 vColor; varying vec3 vNormal; varying vec3 vWorld;
+        void main() {
+          vColor = aColor; vNormal = normal;
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorld = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }`,
+      fragmentShader: GLSL_COMMON + `
+        uniform float uFogDensity;
+        varying vec3 vColor; varying vec3 vNormal; varying vec3 vWorld;
+        void main() {
+          vec3 N = normalize(vNormal);
+          float diff = max(dot(N, uSunDir), 0.0);
+          vec3 amb = mix(vec3(0.05, 0.05, 0.04), skyColor(N) * 0.55, 0.65 + 0.35 * N.y);
+          vec3 col = vColor * (sunLight() * diff * 0.9 + amb);
+          vec3 toCam = cameraPosition - vWorld;
+          float dist = length(toCam);
+          vec3 hdir = normalize(vec3(-toCam.x, 0.04, -toCam.z));
+          col = mix(col, skyColor(hdir), 1.0 - exp(-dist * uFogDensity));
+          gl_FragColor = vec4(tonemap(col), 1.0);
+        }`
+    });
+
+    const ramp = [[0.000, [0.45, 0.38, 0.24]], [0.012, [0.05, 0.11, 0.03]], [0.300, [0.07, 0.17, 0.04]],
+                  [0.560, [0.17, 0.14, 0.08]], [0.800, [0.13, 0.12, 0.11]], [1.000, [0.30, 0.28, 0.27]]];
+    function rampColor(t, out) {
+      t = Math.min(Math.max(t, 0), 1);
+      for (let i = 1; i < ramp.length; i++) {
+        if (t <= ramp[i][0]) {
+          const a = ramp[i - 1], b = ramp[i];
+          const f = (t - a[0]) / (b[0] - a[0]);
+          for (let c = 0; c < 3; c++) out[c] = a[1][c] + (b[1][c] - a[1][c]) * f;
+          return;
+        }
+      }
+      out[0] = ramp[5][1][0]; out[1] = ramp[5][1][1]; out[2] = ramp[5][1][2];
+    }
+
+    let terrain = null;
+    let heights = null;
+    function buildTerrain(src) {
+      heights = src;
+      const pos = new Float32Array(NX * NZ * 3);
+      for (let j = 0; j < NZ; j++) {
+        for (let i = 0; i < NX; i++) {
+          const o = (j * NX + i) * 3;
+          const hh = src[j * NX + i];
+          pos[o] = (i / (NX - 1) - 0.5) * SIZE_X;
+          pos[o + 1] = hh >= 1 ? hh : -25;              // 1 m 미만은 바다 -> 바닥으로
+          pos[o + 2] = (j / (NZ - 1) - 0.5) * SIZE_Z;    // +z = 남쪽
+        }
+      }
+      const idx = new Uint32Array((NX - 1) * (NZ - 1) * 6);
+      let n = 0;
+      for (let j = 0; j < NZ - 1; j++) {
+        for (let i = 0; i < NX - 1; i++) {
+          const a = j * NX + i, b = a + 1, c = a + NX, d = c + 1;
+          idx[n++] = a; idx[n++] = c; idx[n++] = b;
+          idx[n++] = b; idx[n++] = c; idx[n++] = d;
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      g.computeVertexNormals();
+      const nor = g.getAttribute('normal');
+      const col = new Float32Array(NX * NZ * 3);
+      const tmp = [0, 0, 0], rock = [0.14, 0.13, 0.12];
+      for (let v = 0; v < NX * NZ; v++) {
+        rampColor(pos[v * 3 + 1] / MAX_ELEV, tmp);
+        const slope = 1 - nor.getY(v);
+        const m = Math.min(Math.max((slope - 0.12) / 0.3, 0), 1) * 0.8;
+        for (let c = 0; c < 3; c++) col[v * 3 + c] = tmp[c] + (rock[c] - tmp[c]) * m;
+      }
+      g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+      if (terrain) { scene.remove(terrain); terrain.geometry.dispose(); }
+      terrain = new THREE.Mesh(g, terrainMat);
+      terrain.frustumCulled = false;
+      scene.add(terrain);
+    }
+
+    function groundAt(x, z) {
+      if (!heights) return 0;
+      const i = Math.min(Math.max(Math.round((x / SIZE_X + 0.5) * (NX - 1)), 0), NX - 1);
+      const j = Math.min(Math.max(Math.round((z / SIZE_Z + 0.5) * (NZ - 1)), 0), NZ - 1);
+      return Math.max(heights[j * NX + i], 0);
+    }
+    // x=0 열에서 남쪽(+z)부터 훑어 첫 육지(해안선)의 z
+    function coastZ() {
+      const i = Math.round((NX - 1) / 2);
+      for (let j = NZ - 1; j >= 0; j--) {
+        if (heights[j * NX + i] >= 1) return (j / (NZ - 1) - 0.5) * SIZE_Z;
+      }
+      return 0.3 * SIZE_Z;
+    }
+
+    /* ====================== 카메라 / 조작 ====================== */
+    const cam = { x: 0, y: 300, z: 0, bearing: 190, pitch: -2 };   // bearing: 북 0도, 시계방향
+    function applyCamera() {
+      cam.y = Math.max(cam.y, 6);
+      // 높이 올라갈수록 가까운 면(near)을 멀리 두어 깊이 정밀도를 확보(바닷속 바닥이 비쳐 보이는 현상 방지)
+      const near = Math.min(Math.max(cam.y * 0.03, 2), 900);
+      if (Math.abs(near - camera.near) > 0.01) { camera.near = near; camera.updateProjectionMatrix(); }
+      // 하늘 높이 올라가면 대기가 얇아져 안개도 옅어짐
+      sharedUniforms.uFogDensity.value = 0.000012 * Math.exp(-cam.y / 5000);
+      camera.position.set(cam.x, cam.y, cam.z);
+      camera.rotation.set(THREE.MathUtils.degToRad(cam.pitch), -THREE.MathUtils.degToRad(cam.bearing), 0);
+    }
+    function setView(name) {
+      const cz = coastZ();
+      if (name === 'coast') Object.assign(cam, { x: 0, z: cz - 900, y: groundAt(0, cz - 900) + 230, bearing: 188, pitch: 3 });
+      else if (name === 'sea') Object.assign(cam, { x: 0, z: cz + 1400, y: 28, bearing: 185, pitch: 6 });
+      else if (name === 'peak') Object.assign(cam, { x: 600, z: -1800, y: 3300, bearing: 190, pitch: -24 });
+      else Object.assign(cam, { x: 0, z: SIZE_Z * 0.95, y: 36000, bearing: 0, pitch: -38 });
+      applyCamera();
+      if (follow && (name === 'coast' || name === 'sea') && typeof lookAtSun === 'function') lookAtSun();
+      document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.v === name));
+    }
+
+    let dragging = false, lastX = 0, lastY = 0;
+    canvas.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener('pointerup', () => { dragging = false; });
+    canvas.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      cam.bearing -= (e.clientX - lastX) * 0.18;
+      cam.pitch = Math.min(Math.max(cam.pitch + (e.clientY - lastY) * 0.18, -85), 85);
+      lastX = e.clientX; lastY = e.clientY;
+      applyCamera();
+    });
+    function moveForward(dist) {
+      const b = THREE.MathUtils.degToRad(cam.bearing), p = THREE.MathUtils.degToRad(cam.pitch);
+      cam.x += Math.sin(b) * Math.cos(p) * dist;
+      cam.z += -Math.cos(b) * Math.cos(p) * dist;
+      cam.y += Math.sin(p) * dist;
+      applyCamera();
+    }
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      moveForward(-e.deltaY * Math.max(cam.y, 40) * 0.0016);
+    }, { passive: false });
+
+    const keys = {};
+    window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+    window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+    function updateKeys(dt) {
+      const speed = Math.max(cam.y, 60) * 0.9 * (keys.shift ? 4 : 1) * dt;
+      let moved = false;
+      const b = THREE.MathUtils.degToRad(cam.bearing);
+      if (keys.w) { cam.x += Math.sin(b) * speed; cam.z -= Math.cos(b) * speed; moved = true; }
+      if (keys.s) { cam.x -= Math.sin(b) * speed; cam.z += Math.cos(b) * speed; moved = true; }
+      if (keys.d) { cam.x += Math.cos(b) * speed; cam.z += Math.sin(b) * speed; moved = true; }
+      if (keys.a) { cam.x -= Math.cos(b) * speed; cam.z -= Math.sin(b) * speed; moved = true; }
+      if (keys.e) { cam.y += speed; moved = true; }
+      if (keys.q) { cam.y -= speed; moved = true; }
+      if (moved) applyCamera();
+    }
+
+    /* ====================== 태양 / UI ====================== */
+    const ui = {
+      t: document.getElementById('tSlider'), tOut: document.getElementById('tOut'),
+      play: document.getElementById('play'), dayLen: document.getElementById('dayLen'), dayOut: document.getElementById('dayOut'),
+      amp: document.getElementById('amp'), ampOut: document.getElementById('ampOut'),
+      wind: document.getElementById('wind'), windOut: document.getElementById('windOut'),
+      clock: document.getElementById('clock'), sunInfo: document.getElementById('sunInfo'),
+      demInfo: document.getElementById('demInfo')
+    };
+    let playing = true;
+    let follow = true;                  // 카메라가 태양의 방위 변화를 따라 같이 돈다
+    let prevAz = null;
+    let dayT = parseFloat(ui.t.value);
+
+    function sunAngles(t) {
+      return {
+        az: SUN_AZ0 + (SUN_AZ1 - SUN_AZ0) * t,                            // 방위각(북 0도, 시계방향)
+        el: Math.max(SUN_PEAK * Math.sin(Math.PI * t), 1.5)               // 고도
+      };
+    }
+    function lookAtSun() {
+      const s = sunAngles(dayT);
+      cam.bearing = s.az;
+      cam.pitch = Math.min(Math.max(s.el * 0.45, 3), 14);
+      applyCamera();
+      prevAz = s.az;
+    }
+
+    function updateSun() {
+      const t = dayT;
+      const { az, el } = sunAngles(t);
+      if (follow && prevAz !== null && Math.abs(az - prevAz) < 60) { cam.bearing += az - prevAz; applyCamera(); }
+      prevAz = az;
+      const a = THREE.MathUtils.degToRad(az), e = THREE.MathUtils.degToRad(el);
+      sharedUniforms.uSunDir.value.set(Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e)).normalize();
+      const minutes = 6 * 60 + t * 12 * 60;
+      const hh = Math.floor(minutes / 60), mm = Math.floor(minutes % 60);
+      ui.clock.textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+      ui.sunInfo.textContent = '방위 ' + az.toFixed(0) + '° · 고도 ' + el.toFixed(0) + '°';
+      ui.tOut.textContent = '';
+      ui.t.value = t;
+    }
+
+    ui.t.addEventListener('input', () => { dayT = parseFloat(ui.t.value); updateSun(); });
+    ui.play.addEventListener('click', () => {
+      playing = !playing;
+      ui.play.textContent = playing ? '⏸ 태양 멈추기' : '▶ 태양 움직이기';
+      ui.play.classList.toggle('on', playing);
+    });
+    const followBtn = document.getElementById('follow');
+    followBtn.addEventListener('click', () => {
+      follow = !follow;
+      followBtn.classList.toggle('on', follow);
+      if (follow) lookAtSun();
+    });
+    ui.dayLen.addEventListener('input', () => { ui.dayOut.textContent = ui.dayLen.value + '초'; });
+    ui.amp.addEventListener('input', () => {
+      sharedUniforms.uAmp.value = parseFloat(ui.amp.value);
+      ui.ampOut.textContent = parseFloat(ui.amp.value).toFixed(1) + 'x';
+    });
+    ui.wind.addEventListener('input', () => {
+      sharedUniforms.uWindDir.value = THREE.MathUtils.degToRad(parseFloat(ui.wind.value));
+      ui.windOut.textContent = ui.wind.value + '°';
+    });
+    sharedUniforms.uWindDir.value = THREE.MathUtils.degToRad(parseFloat(ui.wind.value));
+    document.querySelectorAll('#views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.v)));
+
+    const hudBody = document.getElementById('hudBody'), toggle = document.getElementById('toggle');
+    toggle.addEventListener('click', () => {
+      const hide = !hudBody.classList.contains('hide');
+      hudBody.classList.toggle('hide', hide);
+      toggle.textContent = hide ? '펼치기' : '접기';
+      toggle.setAttribute('aria-expanded', String(!hide));
+    });
+
+    if (window.innerWidth < 700) toggle.click();       // 좁은 화면에서는 처음에 패널을 접어 둔다
+
+    /* ---- DEM 이미지 불러오기: 위쪽=북쪽, 밝기 0~255 -> 0~1947 m ---- */
+    document.getElementById('demFile').addEventListener('change', e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = NX; c.height = NZ;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(img, 0, 0, NX, NZ);
+        const px = ctx.getImageData(0, 0, NX, NZ).data;
+        const h = new Float32Array(NX * NZ);
+        let max = 0;
+        for (let v = 0; v < NX * NZ; v++) { h[v] = px[v * 4] / 255 * MAX_ELEV; if (h[v] > max) max = h[v]; }
+        buildTerrain(h);
+        setView('coast');
+        ui.demInfo.textContent = 'DEM 적용: ' + file.name + ' (' + img.width + '×' + img.height + ', 최고 ' + max.toFixed(0) + ' m). 브라우저는 8비트로 읽어요.';
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => { ui.demInfo.textContent = '이미지를 읽지 못했어요.'; URL.revokeObjectURL(url); };
+      img.src = url;
+      e.target.value = '';
+    });
+    document.getElementById('demReset').addEventListener('click', () => {
+      buildTerrain(proceduralHeights());
+      setView('coast');
+      ui.demInfo.textContent = 'DEM이 없어서 한라산 모양의 가짜 섬을 쓰고 있어요.';
+    });
+
+    /* ====================== 루프 ====================== */
+    function resize() {
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      // 한 픽셀이 보는 각도: 잔물결 안티앨리어싱 기준
+      sharedUniforms.uPixel.value = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / (h * renderer.getPixelRatio());
+    }
+    window.addEventListener('resize', resize);
+
+    buildTerrain(proceduralHeights());
+    setView('coast');
+    resize();
+    updateSun();
+
+    let last = performance.now(), frames = 0, fpsT = 0;
+    const fpsEl = document.getElementById('fps');
+    function frame(now) {
+      const dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      sharedUniforms.uTime.value += dt;
+      if (playing) {
+        dayT += dt / parseFloat(ui.dayLen.value);
+        if (dayT > 1) dayT -= 1;
+        updateSun();
+      }
+      updateKeys(dt);
+      sky.position.copy(camera.position);
+      ocean.position.set(camera.position.x, 0, camera.position.z);
+      renderer.render(scene, camera);
+      frames++; fpsT += dt;
+      if (fpsT > 0.5) { fpsEl.textContent = Math.round(frames / fpsT) + ' fps'; frames = 0; fpsT = 0; }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    // 테스트/디버깅용
+    window.__jeju = { cam, setView, setTime: v => { dayT = v; updateSun(); }, applyCamera, sharedUniforms, THREE };
+  })();
+  </script>
+</body>
+</html>

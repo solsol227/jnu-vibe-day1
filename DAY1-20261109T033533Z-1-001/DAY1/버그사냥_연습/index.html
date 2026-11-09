@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>버그사냥 연습 — 돌담귤방(가상)</title>
+<style>
+body{font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;margin:0;background:#FFFAF2;color:#1F2D3B}
+header{background:#E8731C;color:#fff;padding:20px 16px}h1{margin:0;font-size:1.3em}
+main{max-width:640px;margin:0 auto;padding:16px}
+label{font-weight:700}input{font-size:1em;padding:6px 10px;margin:0 6px;width:120px}
+ul{list-style:none;padding:0}li{background:#fff;border-radius:12px;padding:12px 14px;margin:8px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.season{background:#E9F7EE;color:#2F7A45;border-radius:6px;padding:0 6px;font-size:.8em;margin-left:6px;font-weight:700}
+</style></head>
+<body>
+<header><h1>돌담귤방 (가상) — 버그사냥 연습</h1></header>
+<main>
+  <p>이번 달: <b id="month"></b> · 예산으로 선물 고르기</p>
+  <label for="budget">예산(원)</label><input id="budget" type="number" value="30000"><button id="go">추천</button>
+  <h2>추천</h2><ul id="gifts"></ul>
+  <h2>전체 상품</h2><ul id="all"></ul>
+</main>
+<script src="data.js"></script>
+<script src="shop.js"></script>
+<script>
+  const month = new Date().getMonth() + 1;
+  document.getElementById('month').textContent = month + '월';
+  function row(p) {
+    const li = document.createElement('li');
+    li.textContent = p.name + ' — ' + Shop.formatPrice(p.price);
+    if (Shop.inSeason(p, month)) { const s = document.createElement('span'); s.className = 'season'; s.textContent = '제철'; li.appendChild(s); }
+    return li;
+  }
+  PRODUCTS.forEach(p => document.getElementById('all').appendChild(row(p)));
+  function show() {
+    const ul = document.getElementById('gifts'); ul.innerHTML = '';
+    Shop.pickGifts(PRODUCTS, Number(document.getElementById('budget').value)).forEach(p => ul.appendChild(row(p)));
+  }
+  document.getElementById('go').addEventListener('click', show); show();
+</script>
+</body></html>

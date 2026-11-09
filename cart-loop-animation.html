@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>장바구니 50개로 배우는 반복문</title>
+  <style>
+    :root {
+      --orange: #ff7a45;
+      --orange-soft: #fff1e8;
+      --amber: #ffb347;
+      --purple: #7c4dff;
+      --purple-soft: #efe9ff;
+      --cyan: #19c3e0;
+      --green: #20b97a;
+      --green-soft: #dcf7ea;
+      --red: #ff4d6d;
+      --text: #2a2438;
+      --muted: #8b8499;
+      --line: #e9e3f4;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      color: var(--text);
+      line-height: 1.55;
+      padding: 16px 16px 200px;
+      background: linear-gradient(180deg, #fff6ee 0%, #f3edff 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; }
+    h1 {
+      font-size: 1.6rem;
+      background: linear-gradient(90deg, var(--orange), var(--purple));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .sub { color: var(--muted); margin-bottom: 14px; font-size: .95rem; }
+
+    .split { display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; align-items: start; }
+    @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+
+    .screen { background: var(--card); border-radius: 20px; box-shadow: 0 8px 30px rgba(80, 50, 140, .12); overflow: hidden; }
+    .screen-title { padding: 10px 16px; font-weight: bold; font-size: .95rem; color: #fff; }
+    .left .screen-title { background: linear-gradient(90deg, var(--orange), var(--amber)); display: flex; justify-content: space-between; align-items: center; }
+    .right .screen-title { background: linear-gradient(90deg, var(--purple), var(--cyan)); }
+    .body { padding: 14px; }
+
+    /* ======== 왼쪽: 쇼핑몰 ======== */
+    .badge-wrap { position: relative; font-size: 1.5rem; line-height: 1; }
+    .badge {
+      position: absolute; top: -8px; right: -12px; min-width: 22px; padding: 1px 6px; border-radius: 999px;
+      background: var(--red); color: #fff; font-size: .75rem; font-weight: bold; text-align: center;
+    }
+    .badge.bump { animation: bump .5s ease; }
+    @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.6); } 100% { transform: scale(1); } }
+
+    .product {
+      border: 2px dashed var(--line); border-radius: 16px; padding: 14px; margin-bottom: 14px;
+      display: flex; gap: 14px; align-items: center; min-height: 148px; transition: border-color .3s, background .3s;
+    }
+    .product.on { border: 2px solid var(--orange); background: var(--orange-soft); }
+    .product .emoji { font-size: 4.2rem; width: 90px; text-align: center; line-height: 1; }
+    .product .emoji.pop { animation: pop .5s ease; }
+    @keyframes pop { 0% { transform: scale(.4) rotate(-12deg); } 60% { transform: scale(1.2) rotate(4deg); } 100% { transform: none; } }
+    .product .info { flex: 1; }
+    .product .pname { font-size: 1.2rem; font-weight: bold; }
+    .product .pprice { color: var(--muted); margin-bottom: 8px; }
+    .qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 8px; background: #fff; }
+    .qty span { padding: 3px 12px; }
+    .qty .n { font-weight: bold; min-width: 44px; text-align: center; }
+    .add-btn {
+      display: block; width: 100%; padding: 8px; border: none; border-radius: 10px; font: inherit; font-weight: bold;
+      background: var(--orange); color: #fff; cursor: default; transition: background .3s, transform .2s;
+    }
+    .add-btn.pressed { background: var(--green); transform: scale(.96); }
+    .product .waiting { color: var(--muted); width: 100%; text-align: center; }
+
+    .cart-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-weight: bold; }
+    .cart-head small { color: var(--muted); font-weight: normal; }
+    .clist { max-height: 330px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; padding: 4px 10px; background: #fcfbff; }
+    .clist .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+    .crow { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: .92rem; }
+    .crow:last-child { border-bottom: none; }
+    .crow .e { font-size: 1.4rem; }
+    .crow .n small { display: block; color: var(--muted); font-size: .76rem; }
+    .crow b { font-variant-numeric: tabular-nums; }
+    .crow.new { animation: slide .55s ease; background: var(--green-soft); border-radius: 8px; }
+    @keyframes slide { from { transform: translateX(-30px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+    .totalbar { margin-top: 10px; padding: 10px 14px; border-radius: 14px; background: linear-gradient(90deg, var(--orange-soft), var(--purple-soft)); display: flex; justify-content: space-between; align-items: center; }
+    .totalbar span { font-weight: bold; }
+    .totalbar b { font-size: 1.6rem; color: var(--orange); font-variant-numeric: tabular-nums; }
+    .totalbar b.pulse { animation: bump .5s ease; }
+    .totalbar.final { background: linear-gradient(90deg, #ffe08a, #ffb3c7); }
+
+    /* ======== 오른쪽: 로직 ======== */
+    .code { background: #1f1836; border-radius: 12px; padding: 8px; margin-bottom: 12px; }
+    .code-line {
+      display: flex; font-family: Consolas, "D2Coding", monospace; font-size: .9rem; color: #e8defc;
+      padding: 2px 8px; border-radius: 6px; border-left: 3px solid transparent; white-space: pre; overflow-x: auto;
+    }
+    .code-line .no { width: 24px; flex: none; color: #6a5c92; user-select: none; }
+    .code-line.active { background: rgba(255, 122, 69, .28); border-left-color: var(--amber); }
+    .code-line .cm { color: #8478ad; }
+
+    .cycle-box { background: var(--purple-soft); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+    .cycle-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-weight: bold; }
+    .cycle-top small { color: var(--muted); font-weight: normal; }
+    .cycle { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+    .pill { flex: 1; min-width: 86px; text-align: center; padding: 6px 4px; border-radius: 999px; background: #fff; border: 2px solid var(--line); font-size: .85rem; color: var(--muted); transition: all .25s; }
+    .pill.on { background: var(--orange); border-color: var(--orange); color: #fff; font-weight: bold; transform: scale(1.06); }
+    .arrow { color: var(--muted); }
+    .bar { height: 12px; border-radius: 999px; background: #fff; overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--orange), var(--purple)); transition: width .25s; }
+
+    .vars { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .var { position: relative; border: 2px solid var(--line); border-radius: 12px; padding: 6px 8px; text-align: center; background: #fff; min-height: 70px; }
+    .var .name { font-family: Consolas, monospace; font-size: .78rem; color: var(--purple); font-weight: bold; }
+    .var .val { font-size: 1.05rem; font-weight: bold; font-variant-numeric: tabular-nums; word-break: break-all; }
+    .var .val small { display: block; font-weight: normal; font-size: .74rem; color: var(--muted); }
+    .var.empty .val { color: var(--muted); font-weight: normal; }
+    .var.hot { animation: hot .7s ease; }
+    @keyframes hot { 0% { background: #fff; } 30% { background: #ffe9d6; border-color: var(--orange); transform: scale(1.06); } 100% { background: #fff; } }
+
+    .belt-title { font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+    .belt { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-bottom: 12px; }
+    .bc { text-align: center; border: 2px solid var(--line); border-radius: 8px; background: #fff; padding: 1px 0; font-size: 1.05rem; line-height: 1.2; transition: background .2s, border-color .2s, transform .2s, opacity .3s; }
+    .bc small { display: block; font-size: .55rem; color: var(--muted); line-height: 1; padding-bottom: 1px; }
+    .belt.off .bc { opacity: .15; }
+    .bc.done { background: var(--green-soft); border-color: var(--green); }
+    .bc.cur { background: var(--orange-soft); border-color: var(--orange); transform: scale(1.18); position: relative; z-index: 1; }
+    .bc.cur.added { background: var(--green-soft); border-color: var(--green); }
+
+    .explain { background: linear-gradient(135deg, #e8fbff, #efe9ff); border-radius: 14px; padding: 12px 14px; min-height: 120px; margin-bottom: 12px; }
+    .explain .title { font-weight: bold; color: var(--purple); margin-bottom: 4px; }
+    .explain code { font-family: Consolas, monospace; background: rgba(0, 0, 0, .07); padding: 0 5px; border-radius: 5px; }
+    .console { background: #1f1836; border-radius: 12px; padding: 8px 12px; font-family: Consolas, monospace; color: #7ee2a8; min-height: 38px; }
+    .console .lbl { color: #8478ad; font-size: .75rem; display: block; }
+    .console div::before { content: "> "; color: #5b6e63; }
+
+    .chip {
+      position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none; padding: 3px 12px; border-radius: 999px;
+      font-weight: bold; color: #fff; background: linear-gradient(90deg, var(--orange), var(--purple));
+      box-shadow: 0 0 16px rgba(124, 77, 255, .7);
+    }
+    .chip.big { font-size: 1.6rem; background: none; box-shadow: none; padding: 0; }
+
+    /* ======== 컨트롤 ======== */
+    .controls { position: fixed; left: 50%; transform: translateX(-50%); bottom: 10px; width: min(1148px, calc(100% - 32px)); background: rgba(255, 255, 255, .96); border-radius: 16px; padding: 10px 14px; box-shadow: 0 8px 28px rgba(60, 30, 120, .25); z-index: 20; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .cbtn { font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--text); cursor: pointer; }
+    .cbtn:hover:not(:disabled) { border-color: var(--orange); }
+    .cbtn:disabled { opacity: .35; cursor: default; }
+    .cbtn.main { background: linear-gradient(90deg, var(--orange), var(--purple)); color: #fff; border-color: transparent; font-weight: bold; }
+    .progress { flex: 1; min-width: 140px; }
+    input[type=range] { width: 100%; accent-color: var(--orange); }
+    .step-label { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 96px; text-align: right; }
+    .speed { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: .82rem; color: var(--muted); margin-top: 6px; }
+    .speed input[type=range] { max-width: 170px; }
+    .speed label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    @media (max-width: 900px) { .cbtn { padding: 6px 9px; font-size: .84rem; } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛒 장바구니 50개로 배우는 반복문</h1>
+  <p class="sub">왼쪽은 <b>쇼핑몰 화면</b>, 오른쪽은 <b>코드가 하는 일</b>이에요. <b>다음 ▶</b>을 눌러 보고, 익숙해지면 <b>⏯ 자동 재생</b>을 눌러 보세요!</p>
+
+  <div class="split">
+    <!-- 왼쪽: 쇼핑몰 -->
+    <div class="screen left">
+      <div class="screen-title">
+        <span>🛍️ 신나는 마트 (장바구니 화면)</span>
+        <span class="badge-wrap" id="cart-icon">🛒<span class="badge" id="badge">0</span></span>
+      </div>
+      <div class="body">
+        <div class="product" id="product"></div>
+        <div class="cart-head"><span>🧺 내 장바구니</span><small id="cart-sub">0종류 · 0개</small></div>
+        <div class="clist" id="clist"></div>
+        <div class="totalbar" id="totalbar"><span>합계 금액</span><b id="total">0원</b></div>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 로직 -->
+    <div class="screen right">
+      <div class="screen-title">🧠 프로그램은 이렇게 생각해요</div>
+      <div class="body">
+        <div class="code" id="code"></div>
+
+        <div class="cycle-box">
+          <div class="cycle-top"><span id="loop-label">🔁 반복 준비 중</span><small>같은 3단계를 계속 반복해요</small></div>
+          <div class="cycle">
+            <div class="pill" id="p0">① 꺼내기</div><span class="arrow">→</span>
+            <div class="pill" id="p1">② 곱하기</div><span class="arrow">→</span>
+            <div class="pill" id="p2">③ 더하기</div>
+          </div>
+          <div class="bar"><i id="bar"></i></div>
+        </div>
+
+        <div class="vars">
+          <div class="var" id="v-i"><div class="name">i (지금 꺼낸 상품)</div><div class="val"></div></div>
+          <div class="var" id="v-sub"><div class="name">이 상품 값</div><div class="val"></div></div>
+          <div class="var" id="v-sum"><div class="name">sum (합계)</div><div class="val"></div></div>
+        </div>
+
+        <div class="belt-title">📚 <b>data 배열</b> — 칸이 50개예요 (작은 숫자는 번호, 0부터 시작)</div>
+        <div class="belt off" id="belt"></div>
+
+        <div class="explain">
+          <div class="title" id="title"></div>
+          <div id="desc"></div>
+        </div>
+        <div class="console"><span class="lbl">🖥️ 콘솔 (console.log 결과)</span><div id="console-out"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="row">
+    <button class="cbtn" id="btn-first">⏮ 처음</button>
+    <button class="cbtn" id="btn-prev">◀ 이전</button>
+    <button class="cbtn main" id="btn-next">다음 ▶</button>
+    <button class="cbtn" id="btn-play">⏯ 자동 재생</button>
+    <button class="cbtn" id="btn-item">⏩ 다음 상품</button>
+    <button class="cbtn" id="btn-end">⏭ 끝까지</button>
+    <div class="progress"><input type="range" id="slider" min="0" value="0"></div>
+    <div class="step-label" id="step-label"></div>
+  </div>
+  <div class="speed">
+    <span>🐢</span>
+    <input type="range" id="speed" min="150" max="2500" step="50" value="1300" style="direction: rtl">
+    <span>🐇</span>
+    <label><input type="checkbox" id="auto-fast" checked> 처음 3개만 자세히, 이후 자동 빨리감기</label>
+  </div>
+</div>
+
+<script>
+  /* [이모지, 이름, 가격, 개수] — 총 50개 */
+  const RAW = [
+    ['🍎','사과',1500,3], ['🍐','배',3000,2], ['🍊','귤',500,10], ['🍌','바나나',1200,4], ['🍇','포도',4500,1],
+    ['🍓','딸기',5000,2], ['🍉','수박',15000,1], ['🍑','복숭아',2000,5], ['🍒','체리',6000,1], ['🥭','망고',3500,2],
+    ['🍍','파인애플',4000,1], ['🥥','코코넛',3000,1], ['🥝','키위',800,6], ['🍋','레몬',700,5], ['🥑','아보카도',2500,2],
+    ['🍅','토마토',900,8], ['🥕','당근',600,6], ['🌽','옥수수',1000,4], ['🥔','감자',500,10], ['🍆','가지',800,3],
+    ['🥦','브로콜리',1800,2], ['🥬','배추',3500,1], ['🧅','양파',400,7], ['🧄','마늘',300,9], ['🌶️','고추',200,12],
+    ['🍄','버섯',1500,3], ['🥜','땅콩',2500,2], ['🍞','식빵',3000,1], ['🥐','크루아상',2800,2], ['🥯','베이글',2200,3],
+    ['🧀','치즈',4000,1], ['🥚','계란',300,15], ['🥛','우유',2500,2], ['🍚','쌀',20000,1], ['🍜','라면',1000,5],
+    ['🍝','파스타',2500,2], ['🍕','피자',12000,1], ['🍔','햄버거',5500,2], ['🌭','핫도그',2500,3], ['🍗','치킨',18000,1],
+    ['🥩','소고기',30000,1], ['🐟','생선',6000,2], ['🍤','새우',9000,1], ['🍙','주먹밥',1500,4], ['🍫','초콜릿',1800,3],
+    ['🍪','쿠키',2000,2], ['🍩','도넛',1500,4], ['🍦','아이스크림',1200,5], ['☕','커피',4000,2], ['🧃','주스',1800,3]
+  ];
+  const data = RAW.map(([e, name, price, amount]) => ({ e, name, price, amount }));
+  const N = data.length;
+  const fmt = n => n.toLocaleString('ko-KR');
+  const $ = id => document.getElementById(id);
+
+  const CODE = [
+    'const data = [',
+    "  { name: '사과', price: 1500, amount: 3 },",
+    "  { name: '배',   price: 3000, amount: 2 },",
+    '  ... (모두 50개) ...',
+    ']',
+    'let sum = 0',
+    'for (const i of data) {   <span class="cm">// 50개 → 50번 반복</span>',
+    '    sum += i.price * i.amount',
+    '}',
+    'console.log(sum)'
+  ];
+
+  /* ---------- 단계 만들기 ---------- */
+  const steps = [];
+  const iterStart = [];
+  let sum = null, done = 0, shown = false;
+  const out = [];
+  const push = o => steps.push(Object.assign({
+    sum, done, shown, out: out.slice(), k: null, phase: null, sub: null, slow: true, fly: [], cycle: -1, newShown: false
+  }, o));
+
+  push({ line: -1, title: '👋 준비됐어요',
+    desc: '마트에서 <b>50가지 물건</b>을 장바구니에 담고, <b>전부 얼마인지</b> 계산하는 프로그램이에요. <b>다음 ▶</b>을 눌러 시작해요!' });
+
+  shown = true;
+  push({ line: 0, newShown: true, title: '1️⃣ 50개 상품이 든 배열 만들기',
+    desc: '<code>data</code>는 <b>칸이 50개 줄지어 있는 상자</b>(배열)예요. 칸마다 상품 하나가 들어 있고, 상품은 <b>이름(name), 가격(price), 개수(amount)</b>를 가지고 있어요. 번호는 0번부터 49번까지!' });
+
+  sum = 0;
+  push({ line: 5, title: '2️⃣ 합계 상자 sum 만들기',
+    desc: '<code>sum</code>은 <b>계산기의 합계 칸</b>이에요. 처음에는 <b>0</b>에서 시작해요.' });
+
+  for (let k = 0; k < N; k++) {
+    const d = data[k];
+    const slow = k < 3;
+    const sub = d.price * d.amount;
+    const before = sum;
+
+    iterStart.push(steps.length);
+    push({
+      line: 6, k, phase: 'take', slow, cycle: 0,
+      fly: [{ from: 'bc-' + k, to: 'v-i', text: d.e, cls: 'big' }],
+      title: `① 꺼내기 — ${k + 1}번째 상품 ${d.e}`,
+      desc: k === 0
+        ? `<code>for (const i of data)</code>는 "<b>data 안의 물건을 처음부터 끝까지 하나씩 꺼내라!</b>"는 명령이에요. 먼저 <b>0번 칸</b>의 ${d.e} <b>${d.name}</b>을(를) 꺼내서 <b>i</b>에 담았어요. 아래 3줄(꺼내기 → 곱하기 → 더하기)이 <b>50번</b> 반복될 거예요.`
+        : k < 3
+          ? `다음 칸(<b>${k}번</b>)의 ${d.e} <b>${d.name}</b>을(를) 꺼내 <b>i</b>에 담아요. 방금 전 상품은 i에서 빠지고, <b>새 상품이 i에 들어와요</b>.`
+          : `${k + 1}번째 → ${d.e} ${d.name}을(를) i에 담았어요.`
+    });
+
+    push({
+      line: 7, k, phase: 'calc', slow, cycle: 1, sub,
+      title: `② 곱하기 — ${fmt(d.price)} × ${d.amount}`,
+      desc: k < 3
+        ? `<code>i.price * i.amount</code> : <b>가격 × 개수</b>예요. ${d.e} ${d.name} 1개가 ${fmt(d.price)}원이고 ${d.amount}개니까 ${fmt(d.price)} × ${d.amount} = <b>${fmt(sub)}원</b>.`
+        : `${fmt(d.price)} × ${d.amount} = ${fmt(sub)}원`
+    });
+
+    sum += sub;
+    done = k + 1;
+    push({
+      line: 7, k, phase: 'add', slow, cycle: 2, sub,
+      fly: [
+        { from: 'v-sub', to: 'v-sum', text: '+' + fmt(sub) },
+        { from: 'v-i', to: 'cart-icon', text: d.e, cls: 'big' }
+      ],
+      title: `③ 더하기 — 합계 ${fmt(sum)}원`,
+      desc: k < 3
+        ? `<code>sum += …</code> : 합계에 이 상품 값을 더해요. <b>${fmt(before)} + ${fmt(sub)} = ${fmt(sum)}</b>. 왼쪽 장바구니에도 ${d.e}가 담겼어요!`
+        : `sum = ${fmt(before)} + ${fmt(sub)} = ${fmt(sum)}`
+    });
+  }
+  const LOOP_END = steps.length;
+
+  push({ line: 8, k: null, slow: true, cycle: -1, title: '🏁 반복 끝!',
+    desc: `data에 <b>더 꺼낼 상품이 없어서</b> for문이 끝났어요. 같은 3줄을 <b>${N}번</b> 반복했어요. 상품이 5,000개여도 <b>코드는 똑같이 3줄</b>이에요. 이게 반복문의 힘이에요! 💪` });
+
+  out.push(String(sum));
+  push({ line: 9, k: null, slow: true, cycle: -1, final: true,
+    title: `🎉 총 결제 금액 ${fmt(sum)}원`,
+    desc: `<code>console.log(sum)</code>이 합계를 출력해요. 50개 상품의 (가격 × 개수)를 전부 더한 값은 <b>${fmt(sum)}원</b>이에요.` });
+
+  /* ---------- 화면 틀 ---------- */
+  const codeEl = $('code');
+  CODE.forEach((html, idx) => {
+    const d = document.createElement('div');
+    d.className = 'code-line';
+    d.innerHTML = '<span class="no">' + (idx + 1) + '</span><span>' + html + '</span>';
+    codeEl.appendChild(d);
+  });
+  const codeLines = codeEl.querySelectorAll('.code-line');
+
+  const beltEl = $('belt');
+  data.forEach((d, k) => {
+    const c = document.createElement('div');
+    c.className = 'bc';
+    c.id = 'bc-' + k;
+    c.title = `${k}번: ${d.name}`;
+    c.innerHTML = d.e + '<small>' + k + '</small>';
+    beltEl.appendChild(c);
+  });
+  const bcs = beltEl.querySelectorAll('.bc');
+
+  const slider = $('slider');
+  slider.max = steps.length - 1;
+  let cur = 0, timer = null;
+  const prev = {};
+
+  function setVar(id, html, isEmpty) {
+    const el = $(id), v = el.querySelector('.val');
+    el.classList.toggle('empty', isEmpty);
+    if (prev[id] !== html) {
+      v.innerHTML = html;
+      if (prev[id] !== undefined && !isEmpty) { el.classList.remove('hot'); void el.offsetWidth; el.classList.add('hot'); }
+      prev[id] = html;
+    }
+  }
+  function bump(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+  function fly(fromId, toId, text, cls) {
+    const from = $(fromId), to = $(toId);
+    if (!from || !to || !from.animate) return;
+    const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+    if (!a.width || !b.width) return;
+    const chip = document.createElement('div');
+    chip.className = 'chip ' + (cls || '');
+    chip.textContent = text;
+    document.body.appendChild(chip);
+    const w = chip.offsetWidth, h = chip.offsetHeight;
+    const x0 = a.left + a.width / 2 - w / 2, y0 = a.top + a.height / 2 - h / 2;
+    const x1 = b.left + b.width / 2 - w / 2, y1 = b.top + b.height / 2 - h / 2;
+    const dur = +$('speed').value < 500 ? 450 : 800;
+    const anim = chip.animate([
+      { transform: `translate(${x0}px, ${y0}px) scale(.6)`, opacity: 0 },
+      { transform: `translate(${x0}px, ${y0}px) scale(1.15)`, opacity: 1, offset: .2 },
+      { transform: `translate(${x1}px, ${y1}px) scale(1)`, opacity: 1, offset: .9 },
+      { transform: `translate(${x1}px, ${y1}px) scale(.6)`, opacity: 0 }
+    ], { duration: dur, easing: 'ease-in-out' });
+    anim.onfinish = () => chip.remove();
+  }
+
+  function render(animate) {
+    const s = steps[cur];
+
+    /* 코드 하이라이트 */
+    codeLines.forEach((el, idx) => el.classList.toggle('active', s.line === 0 ? idx <= 4 : idx === s.line));
+
+    /* 반복 사이클 */
+    [0, 1, 2].forEach(n => $('p' + n).classList.toggle('on', s.cycle === n));
+    const finished = s.done;
+    $('loop-label').textContent = s.k !== null
+      ? `🔁 ${s.k + 1}번째 반복 중 (총 ${N}번)`
+      : (s.done === N ? `✅ ${N}번 반복 완료` : '🔁 반복 준비 중');
+    $('bar').style.width = (finished / N * 100) + '%';
+
+    /* 변수 */
+    if (s.k !== null) {
+      const d = data[s.k];
+      setVar('v-i', `${d.e} ${d.name}<small>${fmt(d.price)}원 · ${d.amount}개</small>`, false);
+    } else setVar('v-i', '—', true);
+    setVar('v-sub', s.sub !== null && s.k !== null ? fmt(s.sub) + '원' : '—', s.sub === null || s.k === null);
+    setVar('v-sum', s.sum === null ? '—' : fmt(s.sum), s.sum === null);
+
+    /* 배열 */
+    beltEl.classList.toggle('off', !s.shown);
+    bcs.forEach((c, idx) => {
+      let cls = 'bc';
+      if (s.k !== null) {
+        if (idx < s.k) cls += ' done';
+        else if (idx === s.k) cls += ' cur' + (s.phase === 'add' ? ' added' : '');
+      } else if (idx < s.done) cls += ' done';
+      c.className = cls;
+    });
+
+    /* 설명 / 콘솔 */
+    $('title').textContent = s.title;
+    $('desc').innerHTML = s.desc;
+    const con = $('console-out');
+    con.innerHTML = '';
+    s.out.forEach(t => { const d = document.createElement('div'); d.textContent = t; con.appendChild(d); });
+
+    /* ---- 왼쪽: 상품 / 장바구니 ---- */
+    const prod = $('product');
+    if (s.k !== null) {
+      const d = data[s.k];
+      const pressed = s.phase === 'add';
+      prod.className = 'product on';
+      prod.innerHTML =
+        `<div class="emoji pop" id="pemoji">${d.e}</div>` +
+        `<div class="info"><div class="pname">${d.name}</div>` +
+        `<div class="pprice">1개 ${fmt(d.price)}원</div>` +
+        `<div class="qty"><span>−</span><span class="n">${d.amount}개</span><span>＋</span></div>` +
+        `<button class="add-btn ${pressed ? 'pressed' : ''}" tabindex="-1">${pressed ? '✔ 담았어요!' : '🛒 장바구니 담기'}</button></div>`;
+    } else {
+      prod.className = 'product';
+      prod.innerHTML = '<div class="waiting">' + (s.done === N ? '🎉 쇼핑 끝! 결제하러 가요' : '🛍️ 담을 상품을 기다리는 중...') + '</div>';
+    }
+
+    const list = $('clist');
+    list.innerHTML = '';
+    if (s.done === 0) {
+      list.innerHTML = '<div class="empty">장바구니가 비어 있어요 🫥</div>';
+    } else {
+      let qty = 0;
+      for (let k = 0; k < s.done; k++) {
+        const d = data[k];
+        qty += d.amount;
+        const r = document.createElement('div');
+        r.className = 'crow' + (s.phase === 'add' && k === s.done - 1 ? ' new' : '');
+        r.innerHTML = `<span class="e">${d.e}</span><span class="n">${d.name}<small>${fmt(d.price)}원 × ${d.amount}개</small></span><b>${fmt(d.price * d.amount)}원</b>`;
+        list.appendChild(r);
+      }
+      list.scrollTop = list.scrollHeight;
+    }
+    let qtySum = 0;
+    for (let k = 0; k < s.done; k++) qtySum += data[k].amount;
+    $('cart-sub').textContent = `${s.done}종류 · ${fmt(qtySum)}개`;
+    const badge = $('badge');
+    if (badge.textContent !== String(s.done)) { badge.textContent = s.done; bump(badge, 'bump'); }
+
+    const tb = $('total');
+    const shownTotal = fmt(s.done > 0 ? data.slice(0, s.done).reduce((a, d) => a + d.price * d.amount, 0) : 0) + '원';
+    if (tb.textContent !== shownTotal) { tb.textContent = shownTotal; bump(tb, 'pulse'); }
+    $('totalbar').classList.toggle('final', !!s.final);
+
+    /* 조작 버튼 */
+    slider.value = cur;
+    $('step-label').textContent = '단계 ' + cur + ' / ' + (steps.length - 1);
+    $('btn-first').disabled = $('btn-prev').disabled = cur === 0;
+    $('btn-next').disabled = cur === steps.length - 1;
+    $('btn-item').disabled = $('btn-end').disabled = cur >= steps.length - 1;
+
+    if (animate) s.fly.forEach(f => fly(f.from, f.to, f.text, f.cls));
+  }
+
+  function go(n, animate) { cur = Math.max(0, Math.min(steps.length - 1, n)); render(!!animate); }
+
+  function nextItemIdx() {
+    for (const idx of iterStart) if (idx > cur) return idx;
+    return LOOP_END;
+  }
+
+  function stop() { if (timer) clearTimeout(timer); timer = null; $('btn-play').textContent = '⏯ 자동 재생'; }
+  function delayFor(s) {
+    const base = +$('speed').value;
+    return ($('auto-fast').checked && !s.slow) ? Math.max(40, Math.round(base / 14)) : base;
+  }
+  function tick() {
+    if (cur >= steps.length - 1) { stop(); return; }
+    go(cur + 1, true);
+    timer = setTimeout(tick, delayFor(steps[cur]));
+  }
+  function play() {
+    if (timer) { stop(); return; }
+    if (cur >= steps.length - 1) go(0);
+    $('btn-play').textContent = '⏸ 일시정지';
+    timer = setTimeout(tick, delayFor(steps[cur]));
+  }
+
+  $('btn-first').onclick = () => { stop(); go(0); };
+  $('btn-prev').onclick = () => { stop(); go(cur - 1); };
+  $('btn-next').onclick = () => { stop(); go(cur + 1, true); };
+  $('btn-play').onclick = play;
+  $('btn-item').onclick = () => { stop(); go(nextItemIdx(), true); };
+  $('btn-end').onclick = () => { stop(); go(steps.length - 1); };
+  slider.oninput = () => { stop(); go(+slider.value); };
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') { stop(); go(cur + 1, true); }
+    else if (e.key === 'ArrowLeft') { stop(); go(cur - 1); }
+    else if (e.key === ' ') { e.preventDefault(); play(); }
+  });
+
+  render(false);
+</script>
+</body>
+</html>

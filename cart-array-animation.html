@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>장바구니로 배우는 배열</title>
+  <style>
+    :root {
+      --bg: #fff8ef;
+      --panel: #ffffff;
+      --text: #2a2118;
+      --muted: #8a7a68;
+      --line: #eadfce;
+      --primary: #2f6fed;
+      --primary-soft: #e4edff;
+      --accent: #ff8a3d;
+      --accent-soft: #fff0e3;
+      --ok: #1fa971;
+      --ok-soft: #dff6ec;
+      --code-bg: #2b2118;
+      --code-text: #f1e6d6;
+      --code-active: #5a4026;
+      --console-bg: #1a130d;
+      --console-text: #ffd27e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #17120c;
+        --panel: #231b13;
+        --text: #f3e9da;
+        --muted: #a8977f;
+        --line: #3a2e21;
+        --primary: #7aa5ff;
+        --primary-soft: #21305a;
+        --accent: #ffa05c;
+        --accent-soft: #4a3220;
+        --ok: #43d194;
+        --ok-soft: #173c2e;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      padding: 16px 16px 200px;
+    }
+    .wrap { max-width: 1000px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; }
+    .sub { color: var(--muted); margin-bottom: 16px; font-size: .95rem; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .panel h2 { font-size: .95rem; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
+
+    .top { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .top .panel { margin-bottom: 0; }
+    @media (max-width: 760px) { .top { grid-template-columns: 1fr; } }
+
+    /* ---------- 코드 ---------- */
+    .code { background: var(--code-bg); border-color: var(--code-bg); }
+    .code h2 { color: #b9a58c; }
+    .code-line {
+      display: flex;
+      font-family: Consolas, "D2Coding", monospace;
+      font-size: .93rem;
+      color: var(--code-text);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border-left: 3px solid transparent;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .code-line .no { width: 26px; flex: none; color: #8a735a; user-select: none; }
+    .code-line.active { background: var(--code-active); border-left-color: var(--accent); }
+
+    /* ---------- 변수 / 설명 ---------- */
+    .vars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+    .var {
+      position: relative;
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      text-align: center;
+      background: var(--bg);
+    }
+    .var .name { font-size: .8rem; color: var(--muted); font-family: Consolas, monospace; }
+    .var .val { font-size: 1.4rem; font-weight: bold; min-height: 1.9rem; font-variant-numeric: tabular-nums; }
+    .var.empty .val { color: var(--muted); font-weight: normal; }
+    .var.pulse { animation: pulse .6s ease; }
+    @keyframes pulse {
+      0% { transform: scale(1); border-color: var(--accent); background: var(--accent-soft); }
+      40% { transform: scale(1.1); border-color: var(--accent); background: var(--accent-soft); }
+      100% { transform: scale(1); }
+    }
+    .plus {
+      position: absolute; left: 50%; top: -6px; transform: translateX(-50%);
+      font-weight: bold; color: var(--ok); opacity: 0; pointer-events: none; white-space: nowrap;
+    }
+    .plus.fly { animation: fly 1.1s ease-out; }
+    @keyframes fly {
+      0% { opacity: 0; top: 30px; }
+      20% { opacity: 1; }
+      100% { opacity: 0; top: -34px; }
+    }
+    .explain { background: var(--primary-soft); border-radius: 10px; padding: 12px 14px; min-height: 110px; }
+    .explain .title { font-weight: bold; margin-bottom: 4px; color: var(--primary); }
+    .explain .desc { font-size: .98rem; }
+    .explain code { font-family: Consolas, monospace; background: rgba(0,0,0,.08); padding: 0 4px; border-radius: 4px; }
+
+    /* ---------- 배열 표 ---------- */
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: .8rem; color: var(--muted); margin-bottom: 10px; }
+    .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; border: 1px solid var(--line); }
+    .atable { display: grid; grid-template-columns: 90px repeat(3, 1fr); gap: 6px; align-items: stretch; }
+    .lab { font-family: Consolas, monospace; font-size: .9rem; display: flex; align-items: center; color: var(--muted); }
+    .lab.idx { font-size: .78rem; }
+    .ihead { text-align: center; font-family: Consolas, monospace; font-size: .85rem; color: var(--muted); border-bottom: 2px dashed var(--line); padding-bottom: 2px; }
+    .acell {
+      text-align: center;
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 4px;
+      background: var(--bg);
+      font-weight: bold;
+      font-size: 1.1rem;
+      font-variant-numeric: tabular-nums;
+      transition: background .25s, border-color .25s, transform .25s, opacity .3s;
+    }
+    .acell small { display: block; font-size: .7rem; font-weight: normal; color: var(--muted); }
+    .acell.off { opacity: .12; }
+    .acell.pop { animation: pop .5s ease; }
+    @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+    .acell.col { background: var(--accent-soft); border-color: var(--accent); transform: scale(1.04); }
+    .acell.pick { background: var(--primary-soft); border-color: var(--primary); transform: scale(1.08); }
+    .ihead.col { color: var(--accent); border-bottom-color: var(--accent); font-weight: bold; }
+    .ihead.pick { color: var(--primary); border-bottom-color: var(--primary); font-weight: bold; }
+    .lab.rowhl { color: var(--primary); font-weight: bold; }
+    .acell.rowhl { background: var(--primary-soft); border-color: var(--primary); }
+
+    /* ---------- 장바구니 ---------- */
+    .cart-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+    @media (max-width: 760px) { .cart-grid { grid-template-columns: 1fr; } }
+    .basket {
+      border: 3px solid var(--accent);
+      border-top: none;
+      border-radius: 0 0 24px 24px;
+      min-height: 150px;
+      padding: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 2px;
+      background: linear-gradient(var(--accent-soft), transparent 60%);
+    }
+    .basket .empty { color: var(--muted); font-size: .9rem; width: 100%; text-align: center; padding-top: 50px; }
+    .fruit { font-size: 1.7rem; line-height: 1.1; }
+    .fruit.new { animation: drop .5s cubic-bezier(.3,1.4,.6,1) backwards; }
+    @keyframes drop { from { transform: translateY(-80px) scale(.5); opacity: 0; } to { transform: none; opacity: 1; } }
+    .receipt { font-size: .92rem; }
+    .receipt .r { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--line); font-variant-numeric: tabular-nums; }
+    .receipt .r.new { animation: slide .5s ease; }
+    @keyframes slide { from { transform: translateX(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .receipt .none { color: var(--muted); }
+    .total-box { margin-top: 10px; text-align: right; font-size: 1.2rem; font-weight: bold; }
+    .total-box span { color: var(--accent); font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+
+    /* ---------- 콘솔 ---------- */
+    .console { background: var(--console-bg); border-color: var(--console-bg); }
+    .console h2 { color: #a8977f; }
+    #console { font-family: Consolas, monospace; color: var(--console-text); min-height: 52px; }
+    #console div::before { content: "> "; color: #7a6a55; }
+    #console .empty { color: #7a6a55; }
+    #console .empty::before { content: ""; }
+
+    /* ---------- 컨트롤 ---------- */
+    .controls { position: sticky; bottom: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, .15); margin-bottom: 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button {
+      font: inherit; padding: 8px 14px; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--panel); color: var(--text); cursor: pointer;
+    }
+    button:hover:not(:disabled) { border-color: var(--accent); }
+    button:disabled { opacity: .4; cursor: default; }
+    button.main { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: bold; }
+    .progress { flex: 1; min-width: 160px; }
+    input[type=range] { width: 100%; accent-color: var(--accent); }
+    .step-label { font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+    .speed { display: flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--muted); margin-top: 8px; }
+    .speed input { max-width: 180px; }
+    .hint { font-size: .78rem; color: var(--muted); margin-top: 6px; }
+    @media (max-width: 760px) { .hint { display: none; } button { padding: 7px 10px; font-size: .88rem; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛒 장바구니로 배우는 배열</h1>
+  <p class="sub">사과 🍎 10개, 배 🍐 5개, 귤 🍊 10개의 총 가격을 배열로 계산해 봅니다. <b>다음 ▶</b>을 눌러 한 줄씩 따라가세요.</p>
+
+  <div class="top">
+    <div class="panel code">
+      <h2>📜 코드</h2>
+      <div id="code"></div>
+    </div>
+    <div class="panel">
+      <h2>📦 변수 (값을 담아 두는 상자)</h2>
+      <div class="vars">
+        <div class="var" id="v-i"><div class="name">i (번호)</div><div class="val"></div></div>
+        <div class="var" id="v-subtotal"><div class="name">subtotal</div><div class="val"></div></div>
+        <div class="var" id="v-total"><div class="name">total</div><div class="val"></div><div class="plus"></div></div>
+      </div>
+      <div class="explain">
+        <div class="title" id="title"></div>
+        <div class="desc" id="desc"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>🔢 배열 3개 (같은 번호 = 같은 과일 이야기. 번호는 <b>0부터</b> 시작!)</h2>
+    <div class="legend">
+      <span><i style="background:var(--primary-soft);border-color:var(--primary)"></i>번호로 콕 집은 칸</span>
+      <span><i style="background:var(--accent-soft);border-color:var(--accent)"></i>지금 i번째 칸</span>
+    </div>
+    <div class="atable" id="atable"></div>
+  </div>
+
+  <div class="panel">
+    <h2>🛒 장바구니</h2>
+    <div class="cart-grid">
+      <div class="basket" id="basket"></div>
+      <div>
+        <div class="receipt" id="receipt"></div>
+        <div class="total-box">합계 <span id="total-show">0</span>원</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel console">
+    <h2>🖥️ 콘솔 (console.log 결과가 나오는 곳)</h2>
+    <div id="console"></div>
+  </div>
+
+  <div class="panel controls">
+    <div class="row">
+      <button id="btn-first">⏮ 처음</button>
+      <button id="btn-prev">◀ 이전</button>
+      <button id="btn-next" class="main">다음 ▶</button>
+      <button id="btn-play">⏯ 자동 재생</button>
+      <button id="btn-skip">⏭ 반복문 끝으로</button>
+      <div class="progress"><input type="range" id="slider" min="0" value="0"></div>
+      <div class="step-label" id="step-label"></div>
+    </div>
+    <div class="speed">
+      <span>🐢 느리게</span>
+      <input type="range" id="speed" min="100" max="2000" step="100" value="1100" style="direction: rtl">
+      <span>빠르게 🐇</span>
+    </div>
+    <p class="hint">키보드: ← → 로 이동, 스페이스바로 자동 재생/일시정지</p>
+  </div>
+</div>
+
+<script>
+  const CODE = [
+    "const names  = ['사과', '배', '귤']",
+    "const prices = [100, 1000, 10000]",
+    "const counts = [10, 5, 10]",
+    "console.log(names[1])",
+    "console.log(names.length)",
+    "let total = 0",
+    "for (let i = 0; i < names.length; i++) {",
+    "    const subtotal = prices[i] * counts[i]",
+    "    total += subtotal",
+    "}",
+    "console.log(total)"
+  ];
+
+  const names  = ['사과', '배', '귤'];
+  const emojis = ['🍎', '🍐', '🍊'];
+  const prices = [100, 1000, 10000];
+  const counts = [10, 5, 10];
+  const fmt = n => n.toLocaleString('ko-KR');
+
+  /* ---------- 실행 과정을 "단계" 목록으로 미리 계산 ---------- */
+  const steps = [];
+  let total = null, subtotal = null, iv = null, shown = 0;
+  let cart = [0, 0, 0], rec = 0;
+  const out = [];
+
+  function push(o) {
+    steps.push(Object.assign({
+      total, subtotal, i: iv, shown, cart: cart.slice(), rec, out: out.slice(),
+      hl: null, plus: null, newCart: -1, newRec: -1
+    }, o));
+  }
+
+  push({ line: -1, title: '👋 준비됐어요', desc: '<b>다음 ▶</b>을 눌러 한 줄씩 실행해 보세요. 언제든 <b>◀ 이전</b>으로 돌아올 수 있어요.' });
+
+  shown = 1;
+  push({ line: 0, title: '1️⃣ 이름 배열 만들기', desc: '<code>names</code> 배열에 과일 이름 3개를 담았어요. 배열은 <b>칸이 줄지어 있는 상자</b>예요. 각 칸에는 번호(index)가 붙고 <b>0번부터</b> 시작해요. 사과=0번, 배=1번, 귤=2번.', hl: null, newShown: 0 });
+
+  shown = 2;
+  push({ line: 1, title: '2️⃣ 가격 배열 만들기', desc: '<code>prices</code> 배열도 같은 순서로 만들었어요. <b>0번 칸=사과 가격 100원, 1번=배 1000원, 2번=귤 10000원</b>. 번호가 같으면 같은 과일 이야기예요.', newShown: 1 });
+
+  shown = 3;
+  push({ line: 2, title: '3️⃣ 개수 배열 만들기', desc: '<code>counts</code> 배열은 몇 개를 샀는지예요. 사과 10개, 배 5개, 귤 10개. 이제 <b>번호 하나</b>로 세 배열에서 같은 과일 정보를 꺼낼 수 있어요.', newShown: 2 });
+
+  out.push('배');
+  push({ line: 3, title: '4️⃣ names[1] — 번호로 꺼내기', desc: '<code>names[1]</code>은 "names 배열의 <b>1번 칸</b>"이에요. 0번이 사과, <b>1번이 배</b>니까 <b>배</b>가 출력돼요. (첫 번째 칸이 아니라 두 번째 칸인 이유: 번호가 0부터 시작하기 때문!)', hl: { type: 'cell', row: 0, col: 1 } });
+
+  out.push('3');
+  push({ line: 4, title: '5️⃣ names.length — 칸이 몇 개?', desc: '<code>length</code>는 배열의 <b>칸 수</b>예요. 칸이 3개니까 <b>3</b>이 출력돼요. 마지막 칸의 번호는 length보다 1 작은 <b>2</b>라는 점을 기억하세요.', hl: { type: 'row', row: 0 } });
+
+  total = 0;
+  push({ line: 5, title: '6️⃣ total 만들기', desc: '<code>total</code> 상자를 만들고 <b>0</b>을 넣었어요. 앞으로 과일 값을 여기에 차곡차곡 더할 거예요.' });
+
+  for (let k = 0; k < 3; k++) {
+    iv = k;
+    push({
+      line: 6, hl: { type: 'col', col: k },
+      title: k === 0 ? '🔁 반복 시작: i = 0' : `🔁 i++ → i = ${k}`,
+      desc: k === 0
+        ? `<code>let i = 0</code> : 번호 i를 <b>0</b>부터 시작해요. <code>i &lt; names.length</code> 즉 0 &lt; 3은 <b>참</b>이라 안으로 들어가요.`
+        : `<code>i++</code>로 i가 1 늘어 <b>${k}</b>이 됐어요. <code>${k} &lt; 3</code>은 <b>참</b>이라 한 번 더 반복해요.`
+    });
+
+    subtotal = prices[k] * counts[k];
+    cart[k] = counts[k];
+    rec = k + 1;
+    push({
+      line: 7, hl: { type: 'col', col: k }, newCart: k, newRec: k,
+      title: `🧮 ${emojis[k]} ${names[k]} 계산`,
+      desc: `i가 <b>${k}</b>이니까 <code>prices[${k}]</code>=<b>${fmt(prices[k])}</b>, <code>counts[${k}]</code>=<b>${counts[k]}</b>. 곱하면 ${fmt(prices[k])} × ${counts[k]} = <b>${fmt(subtotal)}</b>이 subtotal에 들어가요. ${emojis[k]} ${counts[k]}개가 장바구니에 담겼어요!`
+    });
+
+    const before = total;
+    total += subtotal;
+    push({
+      line: 8, hl: { type: 'col', col: k }, plus: subtotal,
+      title: `➕ total에 더하기`,
+      desc: `<code>total += subtotal</code> → total = ${fmt(before)} + ${fmt(subtotal)} = <b>${fmt(total)}</b>`
+    });
+  }
+  iv = 3;
+  const LOOP_END = steps.length;
+  push({
+    line: 6, hl: null,
+    title: '🏁 반복 끝: i = 3',
+    desc: '<code>i++</code>로 i가 <b>3</b>이 됐어요. 그런데 <code>3 &lt; names.length</code> 즉 3 &lt; 3은 <b>거짓</b>! 배열에는 3번 칸이 없으니(0, 1, 2번뿐) 반복문을 빠져나와요.'
+  });
+
+  out.push(String(total));
+  push({
+    line: 10, hl: null,
+    title: '🎉 총 구매가격 출력',
+    desc: `1,000 + 5,000 + 100,000 = <b>${fmt(total)}원</b>. 배열 3개를 번호 하나(i)로 함께 읽어서 계산했어요!`
+  });
+
+  /* ---------- 화면 만들기 ---------- */
+  const $ = id => document.getElementById(id);
+
+  const codeEl = $('code');
+  CODE.forEach((text, idx) => {
+    const d = document.createElement('div');
+    d.className = 'code-line';
+    d.innerHTML = '<span class="no">' + (idx + 1) + '</span>';
+    d.appendChild(document.createTextNode(text));
+    codeEl.appendChild(d);
+  });
+  const codeLines = codeEl.querySelectorAll('.code-line');
+
+  /* 배열 표: 번호 행 + 3개 배열 행 */
+  const at = $('atable');
+  const rows = [
+    { label: 'names',  cells: names.map((n, i) => `${emojis[i]} '${n}'`) },
+    { label: 'prices', cells: prices.map(p => String(p)) },
+    { label: 'counts', cells: counts.map(c => String(c)) }
+  ];
+  at.innerHTML = '<div class="lab idx">번호(index)</div>';
+  const iheads = [];
+  for (let c = 0; c < 3; c++) {
+    const h = document.createElement('div');
+    h.className = 'ihead';
+    h.textContent = c;
+    at.appendChild(h);
+    iheads.push(h);
+  }
+  const labs = [], acells = [];
+  rows.forEach((r, ri) => {
+    const lab = document.createElement('div');
+    lab.className = 'lab';
+    lab.textContent = r.label;
+    at.appendChild(lab);
+    labs.push(lab);
+    acells[ri] = [];
+    r.cells.forEach((txt, c) => {
+      const cell = document.createElement('div');
+      cell.className = 'acell off';
+      cell.textContent = txt;
+      at.appendChild(cell);
+      acells[ri].push(cell);
+    });
+  });
+
+  const slider = $('slider');
+  slider.max = steps.length - 1;
+  let cur = 0, timer = null;
+  const prevVals = {};
+
+  function setVar(id, value) {
+    const el = $(id);
+    const valEl = el.querySelector('.val');
+    const text = value === null ? '—' : String(value);
+    el.classList.toggle('empty', value === null);
+    if (prevVals[id] !== text) {
+      valEl.textContent = text;
+      if (prevVals[id] !== undefined && value !== null) {
+        el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
+      }
+      prevVals[id] = text;
+    }
+  }
+
+  function render() {
+    const s = steps[cur];
+
+    codeLines.forEach((el, idx) => el.classList.toggle('active', idx === s.line));
+
+    setVar('v-i', s.i);
+    setVar('v-subtotal', s.subtotal);
+    setVar('v-total', s.total);
+
+    const plusEl = $('v-total').querySelector('.plus');
+    plusEl.classList.remove('fly');
+    if (s.plus !== null) {
+      plusEl.textContent = '+' + fmt(s.plus);
+      void plusEl.offsetWidth;
+      plusEl.classList.add('fly');
+    }
+
+    $('title').textContent = s.title;
+    $('desc').innerHTML = s.desc;
+
+    /* 배열 표 */
+    const hl = s.hl;
+    iheads.forEach((h, c) => {
+      h.className = 'ihead' + (hl && hl.type === 'col' && hl.col === c ? ' col' : '') +
+                             (hl && hl.type === 'cell' && hl.col === c ? ' pick' : '');
+    });
+    labs.forEach((l, r) => {
+      l.className = 'lab' + (hl && hl.type === 'row' && hl.row === r ? ' rowhl' : '');
+    });
+    acells.forEach((rowCells, r) => {
+      rowCells.forEach((cell, c) => {
+        let cls = 'acell' + (r < s.shown ? '' : ' off');
+        if (s.newShown === r) cls += ' pop';
+        if (hl) {
+          if (hl.type === 'col' && hl.col === c) cls += ' col';
+          if (hl.type === 'cell' && hl.row === r && hl.col === c) cls += ' pick';
+          if (hl.type === 'row' && hl.row === r) cls += ' rowhl';
+        }
+        cell.className = cls;
+      });
+    });
+
+    /* 장바구니 */
+    const basket = $('basket');
+    basket.innerHTML = '';
+    const totalItems = s.cart.reduce((a, b) => a + b, 0);
+    if (totalItems === 0) {
+      basket.innerHTML = '<div class="empty">(아직 비어 있어요)</div>';
+    } else {
+      s.cart.forEach((n, k) => {
+        for (let j = 0; j < n; j++) {
+          const f = document.createElement('span');
+          f.className = 'fruit' + (s.newCart === k ? ' new' : '');
+          if (s.newCart === k) f.style.animationDelay = (j * 60) + 'ms';
+          f.textContent = emojis[k];
+          basket.appendChild(f);
+        }
+      });
+    }
+
+    const rc = $('receipt');
+    rc.innerHTML = '';
+    if (s.rec === 0) {
+      rc.innerHTML = '<div class="none">(영수증이 아직 비어 있어요)</div>';
+    } else {
+      for (let k = 0; k < s.rec; k++) {
+        const r = document.createElement('div');
+        r.className = 'r' + (s.newRec === k ? ' new' : '');
+        r.innerHTML = `<span>${emojis[k]} ${names[k]} ${fmt(prices[k])}원 × ${counts[k]}개</span><b>${fmt(prices[k] * counts[k])}원</b>`;
+        rc.appendChild(r);
+      }
+    }
+    $('total-show').textContent = fmt(s.total === null ? 0 : s.total);
+
+    /* 콘솔 */
+    const con = $('console');
+    con.innerHTML = '';
+    if (s.out.length === 0) {
+      con.innerHTML = '<div class="empty">(아직 출력된 내용이 없어요)</div>';
+    } else {
+      s.out.forEach(t => {
+        const d = document.createElement('div');
+        d.textContent = t;
+        con.appendChild(d);
+      });
+    }
+
+    slider.value = cur;
+    $('step-label').textContent = '단계 ' + cur + ' / ' + (steps.length - 1);
+    $('btn-first').disabled = $('btn-prev').disabled = cur === 0;
+    $('btn-next').disabled = cur === steps.length - 1;
+    $('btn-skip').disabled = cur >= LOOP_END;
+  }
+
+  function go(n) { cur = Math.max(0, Math.min(steps.length - 1, n)); render(); }
+
+  function stop() {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    $('btn-play').textContent = '⏯ 자동 재생';
+  }
+  function tick() {
+    if (cur >= steps.length - 1) { stop(); return; }
+    go(cur + 1);
+    timer = setTimeout(tick, +$('speed').value);
+  }
+  function play() {
+    if (timer) { stop(); return; }
+    if (cur >= steps.length - 1) go(0);
+    $('btn-play').textContent = '⏸ 일시정지';
+    timer = setTimeout(tick, +$('speed').value);
+  }
+
+  $('btn-first').onclick = () => { stop(); go(0); };
+  $('btn-prev').onclick = () => { stop(); go(cur - 1); };
+  $('btn-next').onclick = () => { stop(); go(cur + 1); };
+  $('btn-play').onclick = play;
+  $('btn-skip').onclick = () => { stop(); go(LOOP_END); };
+  slider.oninput = () => { stop(); go(+slider.value); };
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') { stop(); go(cur + 1); }
+    else if (e.key === 'ArrowLeft') { stop(); go(cur - 1); }
+    else if (e.key === ' ') { e.preventDefault(); play(); }
+  });
+
+  render();
+</script>
+</body>
+</html>

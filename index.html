@@ -116,6 +116,44 @@
       border-radius: 10px;
     }
 
+    /* ---------- 학습 애니메이션 ---------- */
+    .feature-btn {
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      background: var(--card);
+      border: 2px solid transparent;
+      border-radius: 12px;
+      padding: 18px 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+      color: var(--text);
+      transition: transform .15s, border-color .15s, box-shadow .15s;
+    }
+    .feature-btn:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0, 0, 0, .12); }
+    .feature-btn.active { border-color: var(--accent); background: #fff6ee; }
+    .feature-btn strong { display: block; font-size: 1.05rem; color: var(--primary-dark); margin-bottom: 4px; }
+    .feature-btn span { font-size: .9rem; color: #5a6a69; }
+
+    .viewer { display: none; margin-top: 24px; }
+    .viewer.show { display: block; animation: fade .3s ease; }
+    .viewer-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    .viewer-bar a { font-weight: normal; font-size: .9rem; color: var(--primary); }
+    .viewer iframe {
+      width: 100%;
+      height: 82vh;
+      min-height: 560px;
+      border: 1px solid #d5e3e1;
+      border-radius: 12px;
+      background: #fff;
+    }
+
     footer { text-align: center; padding: 24px; color: #6b7b7a; font-size: .9rem; }
 
     /* ---------- 모바일: 햄버거 메뉴 ---------- */
@@ -131,7 +169,7 @@
         overflow: hidden;
         transition: max-height .3s ease;
       }
-      nav.open { max-height: 320px; }
+      nav.open { max-height: 420px; }
       nav ul { flex-direction: column; padding: 8px 16px 16px; gap: 4px; }
       nav a { padding: 12px 16px; border-radius: 8px; }
       .hero h1 { font-size: 1.5rem; }
@@ -153,6 +191,7 @@
           <li><a href="#food" data-page="food">🍜 음식점</a></li>
           <li><a href="#bus" data-page="bus">🚌 버스</a></li>
           <li><a href="#sights" data-page="sights">📸 관광지</a></li>
+          <li><a href="#study" data-page="study">🎓 학습 애니메이션</a></li>
         </ul>
       </nav>
     </div>
@@ -225,6 +264,36 @@
         <div class="card"><span class="tag">폭포</span><h3>💦 천지연 폭포</h3><p>서귀포에 있는 시원한 폭포와 야간 산책로가 매력적입니다.</p></div>
       </div>
     </section>
+
+    <!-- 학습 애니메이션 -->
+    <section class="page" id="study">
+      <div class="hero">
+        <h1>🎓 학습 애니메이션</h1>
+        <p>버튼을 누르면 아래에 애니메이션이 나타나요. 배열과 반복문을 한 단계씩 따라가 보세요.</p>
+      </div>
+      <div class="grid">
+        <button class="feature-btn" data-src="array-sum-animation.html" data-title="🧮 배열 합계">
+          <strong>🧮 배열 합계</strong><span>숫자 1~100을 차례로 더하며 배열과 for…of 익히기</span>
+        </button>
+        <button class="feature-btn" data-src="cart-array-animation.html" data-title="🍎 장바구니 배열">
+          <strong>🍎 장바구니 배열</strong><span>사과·배·귤 값을 배열 3개와 번호(index)로 계산하기</span>
+        </button>
+        <button class="feature-btn" data-src="object-array-animation.html" data-title="🧙 객체 배열">
+          <strong>🧙 객체 배열</strong><span>객체 상자가 든 배열과 오타 때문에 생기는 NaN 체험</span>
+        </button>
+        <button class="feature-btn" data-src="cart-loop-animation.html" data-title="🛒 장바구니 50개">
+          <strong>🛒 장바구니 50개</strong><span>상품 50개로 반복문의 힘을 눈으로 확인하기</span>
+        </button>
+      </div>
+
+      <div class="viewer" id="viewer">
+        <div class="viewer-bar">
+          <span id="viewer-title"></span>
+          <a id="viewer-open" href="#" target="_blank" rel="noopener">새 창에서 열기 ↗</a>
+        </div>
+        <iframe id="viewer-frame" title="학습 애니메이션"></iframe>
+      </div>
+    </section>
   </main>
 
   <footer>© 2026 제주 여행 가이드 · Jinsol Jin</footer>
@@ -260,6 +329,17 @@
       showPage('jeju');
       setMenu(false);
     });
+    const featureBtns = document.querySelectorAll('.feature-btn');
+    const viewer = document.getElementById('viewer');
+    featureBtns.forEach(btn => btn.addEventListener('click', () => {
+      featureBtns.forEach(b => b.classList.toggle('active', b === btn));
+      document.getElementById('viewer-title').textContent = btn.dataset.title;
+      document.getElementById('viewer-open').href = btn.dataset.src;
+      document.getElementById('viewer-frame').src = btn.dataset.src;
+      viewer.classList.add('show');
+      viewer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
+
     window.addEventListener('hashchange', () => showPage(location.hash.slice(1)));
     showPage(location.hash.slice(1));
   </script>

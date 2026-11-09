@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>객체 배열 마법 실험실</title>
+  <style>
+    :root {
+      --pink: #ff4fa3;
+      --purple: #8b5cf6;
+      --cyan: #22d3ee;
+      --amber: #fbbf24;
+      --green: #34d399;
+      --red: #ff5c7a;
+      --text: #f1eaff;
+      --muted: #a89cc8;
+      --glass: rgba(255, 255, 255, .07);
+      --glass-line: rgba(255, 255, 255, .16);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      color: var(--text);
+      line-height: 1.55;
+      padding: 16px 16px 210px;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(139, 92, 246, .45), transparent 45%),
+        radial-gradient(circle at 85% 20%, rgba(255, 79, 163, .35), transparent 45%),
+        radial-gradient(circle at 50% 100%, rgba(34, 211, 238, .25), transparent 50%),
+        #120a24;
+      background-attachment: fixed;
+    }
+    .wrap { max-width: 1040px; margin: 0 auto; }
+
+    h1 {
+      font-size: 1.7rem;
+      background: linear-gradient(90deg, var(--cyan), var(--pink), var(--amber));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      margin-bottom: 2px;
+    }
+    .sub { color: var(--muted); margin-bottom: 12px; font-size: .95rem; }
+
+    .modes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .mode {
+      font: inherit; cursor: pointer; padding: 8px 16px; border-radius: 999px;
+      border: 1px solid var(--glass-line); background: var(--glass); color: var(--text);
+    }
+    .mode.on.bad { background: linear-gradient(90deg, #ff5c7a, #ff8a3d); border-color: transparent; font-weight: bold; }
+    .mode.on.good { background: linear-gradient(90deg, #22d3ee, #34d399); color: #06211a; border-color: transparent; font-weight: bold; }
+
+    .panel {
+      background: var(--glass);
+      border: 1px solid var(--glass-line);
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 14px;
+      backdrop-filter: blur(6px);
+    }
+    .panel h2 { font-size: .9rem; color: var(--muted); margin-bottom: 10px; font-weight: 600; letter-spacing: .02em; }
+
+    /* ---------- 무대 ---------- */
+    .stage { display: grid; grid-template-columns: 1.15fr 1.2fr .75fr; gap: 14px; align-items: start; }
+    @media (max-width: 860px) { .stage { grid-template-columns: 1fr; } }
+
+    .cards { display: grid; gap: 12px; }
+    .card {
+      position: relative;
+      border-radius: 14px;
+      padding: 12px 12px 10px;
+      background: linear-gradient(145deg, rgba(139, 92, 246, .35), rgba(255, 79, 163, .22));
+      border: 2px solid rgba(255, 255, 255, .2);
+      transition: opacity .3s, transform .3s, box-shadow .3s, border-color .3s, filter .3s;
+    }
+    .card.off { opacity: .12; transform: scale(.94); }
+    .card.pop { animation: pop .6s ease; }
+    @keyframes pop { 0% { transform: scale(.5) rotate(-6deg); } 60% { transform: scale(1.08) rotate(2deg); } 100% { transform: none; } }
+    .card.active {
+      border-color: var(--amber);
+      box-shadow: 0 0 0 3px rgba(251, 191, 36, .25), 0 0 26px rgba(251, 191, 36, .55);
+      transform: scale(1.03);
+    }
+    .card.done { filter: saturate(.5) brightness(.8); }
+    .card .tag {
+      display: flex; justify-content: space-between; font-family: Consolas, monospace;
+      font-size: .78rem; color: var(--cyan); margin-bottom: 8px;
+    }
+    .kv {
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(0, 0, 0, .28); border-radius: 8px; padding: 5px 10px; margin-bottom: 6px;
+      font-family: Consolas, monospace; border: 2px solid transparent;
+      transition: border-color .25s, background .25s, transform .25s;
+    }
+    .kv .key { color: #f9a8d4; }
+    .kv .val { font-weight: bold; font-size: 1.1rem; color: #fff; }
+    .kv.hl { border-color: var(--green); background: rgba(52, 211, 153, .22); transform: scale(1.04); }
+    .kv.ghost { display: none; border: 2px dashed var(--red); background: rgba(255, 92, 122, .15); }
+    .kv.ghost.show { display: flex; animation: shake .5s ease; }
+    .kv.ghost .key { color: var(--red); text-decoration: underline wavy; }
+    .kv.ghost .val { color: var(--red); font-size: .9rem; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+
+    /* i 와 계산기 */
+    .ibox {
+      border-radius: 14px; padding: 10px 12px; margin-bottom: 14px;
+      background: rgba(34, 211, 238, .12); border: 2px dashed rgba(34, 211, 238, .55);
+      display: flex; align-items: center; gap: 12px; min-height: 64px;
+    }
+    .ibox small { font-family: Consolas, monospace; color: var(--cyan); font-size: 1.1rem; font-weight: bold; }
+    .ibox .ival { font-family: Consolas, monospace; font-size: .95rem; color: #fff; }
+    .ibox.glow { animation: glow .8s ease; }
+    @keyframes glow { 0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, .8); } 100% { box-shadow: 0 0 0 22px rgba(34, 211, 238, 0); } }
+
+    .calc { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 6px; align-items: center; }
+    .op { font-size: 1.5rem; color: var(--amber); font-weight: bold; text-align: center; }
+    .slot {
+      text-align: center; border-radius: 12px; padding: 8px 4px; min-height: 76px;
+      background: rgba(0, 0, 0, .3); border: 2px solid var(--glass-line);
+      display: flex; flex-direction: column; justify-content: center;
+      transition: border-color .3s, background .3s;
+    }
+    .slot small { font-family: Consolas, monospace; font-size: .72rem; color: var(--muted); }
+    .slot b { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+    .slot.filled { border-color: var(--green); background: rgba(52, 211, 153, .15); }
+    .slot.bad { border-color: var(--red); background: rgba(255, 92, 122, .18); }
+    .slot.bad b { color: var(--red); }
+    .slot.boom { animation: boom .8s ease; }
+    @keyframes boom {
+      0% { transform: scale(.7); box-shadow: 0 0 0 0 rgba(251, 191, 36, .9); }
+      50% { transform: scale(1.18); box-shadow: 0 0 34px 10px rgba(251, 191, 36, .8); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+    }
+
+    /* 합계 항아리 */
+    .jar {
+      text-align: center; border-radius: 20px 20px 40px 40px; padding: 16px 8px;
+      background: linear-gradient(180deg, rgba(251, 191, 36, .25), rgba(255, 79, 163, .25));
+      border: 2px solid rgba(251, 191, 36, .6);
+    }
+    .jar .emoji { font-size: 2.2rem; }
+    .jar small { display: block; font-family: Consolas, monospace; color: var(--amber); font-weight: bold; }
+    .jar b { display: block; font-size: 1.7rem; font-variant-numeric: tabular-nums; word-break: break-all; }
+    .jar.pulse { animation: boom .8s ease; }
+    .jar.bad { border-color: var(--red); background: linear-gradient(180deg, rgba(255, 92, 122, .3), rgba(139, 0, 40, .25)); animation: shake .6s ease; }
+    .jar.bad b { color: var(--red); }
+
+    .chip {
+      position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none;
+      padding: 4px 12px; border-radius: 999px; font-weight: bold; font-family: Consolas, monospace;
+      color: #1a1030; background: linear-gradient(90deg, var(--amber), var(--pink));
+      box-shadow: 0 0 18px rgba(255, 79, 163, .9);
+    }
+    .chip.bad { color: #fff; background: var(--red); box-shadow: 0 0 18px rgba(255, 92, 122, .9); }
+    .chip.cyan { background: linear-gradient(90deg, var(--cyan), var(--green)); box-shadow: 0 0 18px rgba(34, 211, 238, .9); }
+
+    /* ---------- 코드 / 설명 ---------- */
+    .bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 860px) { .bottom { grid-template-columns: 1fr; } }
+    .code { background: rgba(8, 4, 20, .7); }
+    .code-line {
+      display: flex; font-family: Consolas, "D2Coding", monospace; font-size: .93rem; color: #e9defe;
+      padding: 3px 8px; border-radius: 6px; border-left: 3px solid transparent; white-space: pre; overflow-x: auto;
+    }
+    .code-line .no { width: 26px; flex: none; color: #6d5d94; user-select: none; }
+    .code-line.active { background: rgba(255, 79, 163, .22); border-left-color: var(--pink); }
+    .code-line .bad { color: var(--red); text-decoration: underline wavy var(--red); font-weight: bold; }
+    .code-line .cm { color: #7f72a6; }
+    .note { margin-top: 10px; font-size: .82rem; border-radius: 10px; padding: 8px 10px; }
+    .note.bad { background: rgba(255, 92, 122, .16); color: #ffc2cd; }
+    .note.good { background: rgba(52, 211, 153, .16); color: #b8f5df; }
+
+    .explain {
+      border-radius: 14px; padding: 14px;
+      background: linear-gradient(135deg, rgba(34, 211, 238, .16), rgba(139, 92, 246, .22));
+      min-height: 150px;
+    }
+    .explain .title { font-weight: bold; font-size: 1.1rem; color: var(--cyan); margin-bottom: 6px; }
+    .explain .desc { font-size: .98rem; }
+    .explain code { font-family: Consolas, monospace; background: rgba(0, 0, 0, .35); padding: 0 5px; border-radius: 5px; color: var(--amber); }
+    .explain b { color: #fff; }
+
+    /* ---------- 컨트롤 ---------- */
+    .controls { position: sticky; bottom: 8px; margin-bottom: 0; background: rgba(18, 10, 36, .88); box-shadow: 0 6px 24px rgba(0, 0, 0, .5); }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .cbtn {
+      font: inherit; padding: 8px 14px; border: 1px solid var(--glass-line); border-radius: 10px;
+      background: var(--glass); color: var(--text); cursor: pointer;
+    }
+    .cbtn:hover:not(:disabled) { border-color: var(--pink); }
+    .cbtn:disabled { opacity: .35; cursor: default; }
+    .cbtn.main { background: linear-gradient(90deg, var(--purple), var(--pink)); border-color: transparent; font-weight: bold; }
+    .progress { flex: 1; min-width: 150px; }
+    input[type=range] { width: 100%; accent-color: var(--pink); }
+    .step-label { font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+    .speed { display: flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--muted); margin-top: 8px; }
+    .speed input { max-width: 180px; }
+    @media (max-width: 860px) { .cbtn { padding: 7px 10px; font-size: .88rem; } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🧙 객체 배열 마법 실험실</h1>
+  <p class="sub">상자(객체) 2개가 든 배열을 <b>for…of</b>로 하나씩 꺼내 총합을 구합니다. <b>다음 ▶</b>을 눌러 보세요!</p>
+
+  <div class="modes">
+    <button class="mode bad on" id="m-bad">💥 원본 그대로 (오타 amout → NaN)</button>
+    <button class="mode good" id="m-good">✅ 오타 고친 버전 (amount → 5856)</button>
+  </div>
+
+  <div class="panel">
+    <h2>🎬 무대</h2>
+    <div class="stage">
+      <div>
+        <h2>📚 data 배열 (객체 상자 2개)</h2>
+        <div class="cards" id="cards"></div>
+      </div>
+      <div>
+        <h2>🧺 i 상자 (지금 꺼낸 것)</h2>
+        <div class="ibox" id="ibox"><small>i</small><span class="ival" id="ival">—</span></div>
+        <h2>🧮 계산기</h2>
+        <div class="calc">
+          <div class="slot" id="c-price"><small>i.사과</small><b>?</b></div>
+          <div class="op">×</div>
+          <div class="slot" id="c-amt"><small id="amt-label">i.amout</small><b>?</b></div>
+          <div class="op">=</div>
+          <div class="slot" id="c-res"><small>곱한 값</small><b>?</b></div>
+        </div>
+      </div>
+      <div>
+        <h2>💰 sum 항아리</h2>
+        <div class="jar" id="jar"><div class="emoji">💰</div><small>sum</small><b id="sumval">—</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="panel code" style="margin-bottom:0">
+      <h2>📜 코드</h2>
+      <div id="code"></div>
+      <div class="note bad" id="note"></div>
+    </div>
+    <div class="panel" style="margin-bottom:0">
+      <h2>💡 지금 무슨 일이?</h2>
+      <div class="explain">
+        <div class="title" id="title"></div>
+        <div class="desc" id="desc"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel controls" style="margin-top:14px">
+    <div class="row">
+      <button class="cbtn" id="btn-first">⏮ 처음</button>
+      <button class="cbtn" id="btn-prev">◀ 이전</button>
+      <button class="cbtn main" id="btn-next">다음 ▶</button>
+      <button class="cbtn" id="btn-play">⏯ 자동 재생</button>
+      <div class="progress"><input type="range" id="slider" min="0" value="0"></div>
+      <div class="step-label" id="step-label"></div>
+    </div>
+    <div class="speed">
+      <span>🐢 느리게</span>
+      <input type="range" id="speed" min="200" max="2500" step="100" value="1400" style="direction: rtl">
+      <span>빠르게 🐇</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const data = [
+    { '사과': 100, amount: 5 },
+    { '사과': 103, amount: 52 }
+  ];
+  const fmt = n => (typeof n === 'number' && !Number.isNaN(n)) ? n.toLocaleString('ko-KR') : String(n);
+  const raw = n => String(n);
+
+  let fixed = false;   // false = 원본(오타), true = 오타 고침
+  let steps = [];
+  let cur = 0, timer = null;
+  const $ = id => document.getElementById(id);
+
+  /* ---------- 단계 만들기 ---------- */
+  function build() {
+    steps = [];
+    const amtKey = fixed ? 'amount' : 'amout';
+    let sum = null;
+    let shown = false;
+    let k = null, iHas = false;
+    let calc = { p: null, a: null, r: null };
+    let doneUpTo = 0;
+
+    const push = o => steps.push(Object.assign({
+      shown, sum, k, iHas, calc: Object.assign({}, calc), done: doneUpTo,
+      hl: null, fly: [], boom: null, sumPulse: false
+    }, o));
+
+    push({ line: -1, title: '👋 준비됐어요',
+      desc: '<b>다음 ▶</b>을 눌러 한 줄씩 실행해 보세요. 위쪽 버튼으로 <b>원본(오타)</b>과 <b>고친 버전</b>을 번갈아 볼 수 있어요.' });
+
+    shown = true;
+    push({ line: 0, newShown: true,
+      title: '1️⃣ 객체 2개가 든 배열 만들기',
+      desc: '<code>data</code> 배열에 <b>상자(객체) 2개</b>가 들어 있어요. 상자 하나에는 <b>이름표(key)와 값(value)</b>이 짝지어 들어 있어요. 예) <code>"사과": 100</code>은 이름표 "사과"에 값 100, <code>"amount": 5</code>는 이름표 "amount"에 값 5.' });
+
+    sum = 0;
+    push({ line: 4, title: '2️⃣ sum 항아리 만들기',
+      desc: '<code>sum</code> 항아리를 만들고 <b>0</b>을 넣었어요. 곱한 값들을 여기에 모을 거예요.', sumPulse: true });
+
+    for (let n = 0; n < data.length; n++) {
+      const d = data[n];
+      const price = d['사과'];
+      const amt = fixed ? d.amount : undefined;
+      const res = price * amt;
+      const before = sum;
+
+      k = n; iHas = true; calc = { p: null, a: null, r: null };
+      push({ line: 5, hl: { card: true },
+        fly: [{ from: 'card-' + n, to: 'ibox', text: '{ }', cls: 'cyan' }],
+        title: `🔁 ${n + 1}번째 반복: 상자 꺼내기`,
+        desc: `<code>for (i of data)</code>는 배열에서 상자를 <b>하나씩 꺼내 i에 담아요</b>. ${n + 1}번째로 <b>data[${n}]</b> 상자를 꺼내 i에 넣었어요. (번호가 아니라 <b>상자 자체</b>가 i에 들어와요!)` });
+
+      calc = { p: raw(price), a: null, r: null };
+      push({ line: 6, hl: { card: true, row: 'a' },
+        fly: [{ from: `row-${n}-a`, to: 'c-price', text: raw(price) }],
+        title: `🔎 i.사과 읽기`,
+        desc: `<code>i.사과</code> : 점(<b>.</b>)은 "i 상자 안에서 <b>사과 이름표</b>가 붙은 값을 줘!"라는 뜻이에요. 읽은 값은 <b>${price}</b>.` });
+
+      if (fixed) {
+        calc = { p: raw(price), a: raw(amt), r: null };
+        push({ line: 6, hl: { card: true, row: 'b' },
+          fly: [{ from: `row-${n}-b`, to: 'c-amt', text: raw(amt) }],
+          title: `🔎 i.amount 읽기`,
+          desc: `<code>i.amount</code> : 이번에는 <b>amount 이름표</b>가 붙은 값을 읽어요. 값은 <b>${amt}</b>.` });
+      } else {
+        calc = { p: raw(price), a: 'undefined', r: null };
+        push({ line: 6, hl: { card: true, row: 'g' },
+          fly: [{ from: `row-${n}-g`, to: 'c-amt', text: 'undefined', cls: 'bad' }],
+          title: `❌ i.amout 읽기 — 그런 이름표가 없어요!`,
+          desc: `<code>i.amout</code> : 상자 안에 <b>amout</b>라는 이름표는 없어요. 있는 건 <b>amount</b>예요. (<b>o</b>가 빠졌어요 → <code>amout</code>) 없는 이름표를 읽으면 에러가 나지 않고 조용히 <b>undefined</b>(값 없음)가 나와요. 그래서 더 찾기 어려운 실수예요!` });
+      }
+
+      calc = { p: raw(price), a: fixed ? raw(amt) : 'undefined', r: fixed ? raw(res) : 'NaN' };
+      push({ line: 6, hl: { card: true }, boom: 'r',
+        title: fixed ? `✖️ 곱하기 ${fmt(price)} × ${amt}` : `💣 ${price} × undefined = NaN`,
+        desc: fixed
+          ? `<code>i.사과 * i.amount</code> → ${fmt(price)} × ${amt} = <b>${fmt(res)}</b>`
+          : `숫자에 <b>undefined</b>를 곱하면 계산할 수 없어서 <b>NaN</b>(Not a Number, 숫자가 아님)이 돼요.` });
+
+      sum = before + res;
+      push({ line: 6, hl: { card: true }, sumPulse: true,
+        fly: [{ from: 'c-res', to: 'jar', text: fixed ? '+' + fmt(res) : 'NaN', cls: fixed ? '' : 'bad' }],
+        title: fixed ? `➕ sum += ${fmt(res)}` : `☠️ sum += NaN`,
+        desc: fixed
+          ? `<code>sum += …</code> → sum = ${fmt(before)} + ${fmt(res)} = <b>${fmt(sum)}</b>`
+          : `<code>sum += NaN</code> → ${before} + NaN = <b>NaN</b>. NaN은 <b>무엇과 더해도 NaN</b>이에요. 한번 오염되면 끝까지 NaN!` });
+
+      doneUpTo = n + 1;
+    }
+
+    iHas = false; k = null; calc = { p: null, a: null, r: null };
+    push({ line: 7, title: '🏁 반복 끝',
+      desc: `data 안에 <b>더 꺼낼 상자가 없어서</b> for문이 끝났어요. 상자가 2개였으니 <b>딱 2번</b> 반복했어요.` });
+
+    push({ line: 7, sumPulse: true, sumBad: !fixed,
+      title: fixed ? `🎉 최종 sum = ${fmt(sum)}` : `💥 최종 sum = NaN`,
+      desc: fixed
+        ? `100×5 = 500, 103×52 = 5,356 → <b>500 + 5,356 = ${fmt(sum)}</b>. (원본 코드엔 <code>console.log(sum)</code>이 없어서, 항아리의 값을 직접 보여드렸어요.)`
+        : `원하던 값은 5856인데 결과는 <b>NaN</b>! 원인은 딱 한 글자, <code>i.amout</code> 오타예요. 위의 <b>✅ 오타 고친 버전</b> 버튼을 눌러 비교해 보세요.` });
+  }
+
+  /* ---------- 화면 틀 ---------- */
+  const cardsEl = $('cards');
+  data.forEach((d, n) => {
+    const c = document.createElement('div');
+    c.className = 'card off';
+    c.id = 'card-' + n;
+    c.innerHTML =
+      `<div class="tag"><span>data[${n}]</span><span>{ }</span></div>` +
+      `<div class="kv" id="row-${n}-a"><span class="key">"사과"</span><span class="val">${d['사과']}</span></div>` +
+      `<div class="kv" id="row-${n}-b"><span class="key">"amount"</span><span class="val">${d.amount}</span></div>` +
+      `<div class="kv ghost" id="row-${n}-g"><span class="key">"amout"</span><span class="val">없음!</span></div>`;
+    cardsEl.appendChild(c);
+  });
+
+  const CODE_HTML = () => [
+    'let data = [',
+    '  { "사과": 100, "amount": 5 },',
+    '  { "사과": 103, "amount": 52 },',
+    ']',
+    'let sum = 0',
+    'for (i of data) {   <span class="cm">// 2개 → 2회 반복</span>',
+    '    sum += i.사과 * i.' + (fixed ? 'amount' : '<span class="bad">amout</span>'),
+    '}'
+  ];
+  function buildCode() {
+    const el = $('code');
+    el.innerHTML = '';
+    CODE_HTML().forEach((html, idx) => {
+      const d = document.createElement('div');
+      d.className = 'code-line';
+      d.innerHTML = '<span class="no">' + (idx + 1) + '</span><span>' + html + '</span>';
+      el.appendChild(d);
+    });
+    const note = $('note');
+    if (fixed) {
+      note.className = 'note good';
+      note.innerHTML = '✅ <b>i.amout → i.amount</b> 로 고친 버전이에요. (참고: <code>for (i of data)</code>는 <code>const i</code>로 쓰면 더 안전해요.)';
+    } else {
+      note.className = 'note bad';
+      note.innerHTML = '⚠️ 원본 코드의 <b>i.amout</b>은 <b>amount</b>의 오타예요. 그래서 결과가 <b>NaN</b>이 돼요.';
+    }
+    $('amt-label').textContent = fixed ? 'i.amount' : 'i.amout';
+  }
+
+  /* ---------- 날아가는 숫자 ---------- */
+  function fly(fromId, toId, text, cls) {
+    const from = $(fromId), to = $(toId);
+    if (!from || !to || !from.animate) return;
+    const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+    const chip = document.createElement('div');
+    chip.className = 'chip ' + (cls || '');
+    chip.textContent = text;
+    document.body.appendChild(chip);
+    const w = chip.offsetWidth, h = chip.offsetHeight;
+    const x0 = a.left + a.width / 2 - w / 2, y0 = a.top + a.height / 2 - h / 2;
+    const x1 = b.left + b.width / 2 - w / 2, y1 = b.top + b.height / 2 - h / 2;
+    const anim = chip.animate([
+      { transform: `translate(${x0}px, ${y0}px) scale(.5)`, opacity: 0 },
+      { transform: `translate(${x0}px, ${y0}px) scale(1.15)`, opacity: 1, offset: .2 },
+      { transform: `translate(${x1}px, ${y1}px) scale(1)`, opacity: 1, offset: .9 },
+      { transform: `translate(${x1}px, ${y1}px) scale(.6)`, opacity: 0 }
+    ], { duration: 900, easing: 'ease-in-out' });
+    anim.onfinish = () => chip.remove();
+  }
+
+  function retrigger(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+  function setSlot(id, v, labelOnly) {
+    const el = $(id);
+    const b = el.querySelector('b');
+    el.classList.remove('filled', 'bad');
+    if (v === null) { b.textContent = '?'; return; }
+    b.textContent = (v !== 'undefined' && v !== 'NaN' && !isNaN(Number(v))) ? fmt(Number(v)) : v;
+    el.classList.add(v === 'undefined' || v === 'NaN' ? 'bad' : 'filled');
+  }
+
+  const codeEls = () => document.querySelectorAll('.code-line');
+
+  function render(animate) {
+    const s = steps[cur];
+
+    codeEls().forEach((el, idx) => el.classList.toggle('active', idx === s.line || (s.line === 0 && idx <= 3)));
+
+    data.forEach((d, n) => {
+      const c = $('card-' + n);
+      let cls = 'card' + (s.shown ? '' : ' off');
+      if (s.newShown) cls += ' pop';
+      if (s.k === n && s.iHas) cls += ' active';
+      else if (n < s.done) cls += ' done';
+      c.className = cls;
+      ['a', 'b', 'g'].forEach(r => {
+        const row = $(`row-${n}-${r}`);
+        const on = s.k === n && s.hl && s.hl.row === r;
+        row.classList.toggle('hl', on && r !== 'g');
+        row.classList.toggle('show', on && r === 'g');
+      });
+    });
+
+    const ival = $('ival');
+    ival.textContent = s.iHas ? `{ 사과: ${data[s.k]['사과']}, amount: ${data[s.k].amount} }` : '—';
+    if (s.iHas && s.hl && s.hl.card && !s.hl.row && s.fly.length) retrigger($('ibox'), 'glow');
+
+    setSlot('c-price', s.calc.p);
+    setSlot('c-amt', s.calc.a);
+    setSlot('c-res', s.calc.r);
+    if (s.boom) retrigger($('c-res'), 'boom');
+
+    const jar = $('jar');
+    const sv = $('sumval');
+    sv.textContent = s.sum === null ? '—' : (Number.isNaN(s.sum) ? 'NaN' : fmt(s.sum));
+    jar.classList.remove('bad');
+    if (s.sum !== null && Number.isNaN(s.sum)) { jar.classList.add('bad'); }
+    else if (s.sumPulse) retrigger(jar, 'pulse');
+    if (s.sumBad) retrigger(jar, 'bad');
+
+    $('title').textContent = s.title;
+    $('desc').innerHTML = s.desc;
+
+    $('slider').value = cur;
+    $('step-label').textContent = '단계 ' + cur + ' / ' + (steps.length - 1);
+    $('btn-first').disabled = $('btn-prev').disabled = cur === 0;
+    $('btn-next').disabled = cur === steps.length - 1;
+
+    if (animate) s.fly.forEach(f => fly(f.from, f.to, f.text, f.cls));
+  }
+
+  function go(n, animate) {
+    cur = Math.max(0, Math.min(steps.length - 1, n));
+    render(!!animate);
+  }
+  function stop() { if (timer) clearTimeout(timer); timer = null; $('btn-play').textContent = '⏯ 자동 재생'; }
+  function tick() {
+    if (cur >= steps.length - 1) { stop(); return; }
+    go(cur + 1, true);
+    timer = setTimeout(tick, +$('speed').value);
+  }
+  function play() {
+    if (timer) { stop(); return; }
+    if (cur >= steps.length - 1) go(0);
+    $('btn-play').textContent = '⏸ 일시정지';
+    timer = setTimeout(tick, +$('speed').value);
+  }
+
+  function setMode(isFixed) {
+    stop();
+    fixed = isFixed;
+    $('m-bad').classList.toggle('on', !fixed);
+    $('m-good').classList.toggle('on', fixed);
+    build();
+    buildCode();
+    $('slider').max = steps.length - 1;
+    go(0);
+  }
+
+  $('m-bad').onclick = () => setMode(false);
+  $('m-good').onclick = () => setMode(true);
+  $('btn-first').onclick = () => { stop(); go(0); };
+  $('btn-prev').onclick = () => { stop(); go(cur - 1); };
+  $('btn-next').onclick = () => { stop(); go(cur + 1, true); };
+  $('btn-play').onclick = play;
+  $('slider').oninput = () => { stop(); go(+$('slider').value); };
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') { stop(); go(cur + 1, true); }
+    else if (e.key === 'ArrowLeft') { stop(); go(cur - 1); }
+    else if (e.key === ' ') { e.preventDefault(); play(); }
+  });
+
+  setMode(false);
+</script>
+</body>
+</html>
